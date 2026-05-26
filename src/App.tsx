@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SettingsModal } from './components/SettingsModal';
 import { FileExplorer } from './components/FileExplorer';
-import { GithubCredentials } from './lib/github';
+import type { GithubCredentials } from './lib/github';
 
 function App() {
   const [creds, setCreds] = useState<GithubCredentials | null>(null);

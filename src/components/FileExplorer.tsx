@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
+import type { 
   GithubCredentials, 
-  GithubFile, 
+  GithubFile 
+} from '../lib/github';
+import { 
   fetchContents, 
   uploadFile, 
   deleteFile, 
@@ -22,7 +24,7 @@ import {
   LogOut,
   ExternalLink
 } from 'lucide-react';
-
+import { GithubIcon as Github } from './GithubIcon';
 interface FileExplorerProps {
   creds: GithubCredentials;
   onLogout: () => void;
@@ -47,9 +49,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ creds, onLogout }) =
       });
       setFiles(data);
       setCurrentPath(path);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to load repository contents. Please check your credentials and repository details.');
+      if (err?.message?.includes('Resource not accessible')) {
+        alert('GitHub Token Error: Your Personal Access Token does not have read access. Please ensure your token has "Contents: Read and write" repository permissions.');
+      } else {
+        alert('Failed to load repository contents. Please check your credentials and repository details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -82,9 +88,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ creds, onLogout }) =
       try {
         await deleteFile(creds, file.path, file.sha);
         await loadContents();
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        alert('Failed to delete file.');
+        if (err?.message?.includes('Resource not accessible')) {
+          alert('GitHub Token Error: Your Personal Access Token does not have write access. Please ensure your token has "Contents: Read and write" repository permissions.');
+        } else {
+          alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
+        }
         setLoading(false);
       }
     }
@@ -109,9 +119,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ creds, onLogout }) =
       
       await uploadFile(creds, filePath, base64, `Upload ${file.name}`, sha);
       await loadContents();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to upload file.');
+      if (err?.message?.includes('Resource not accessible')) {
+        alert('GitHub Token Error: Your Personal Access Token does not have write access. Please ensure your token has "Contents: Read and write" repository permissions.');
+      } else {
+        alert(`Failed to upload file: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setUploading(false);
     }

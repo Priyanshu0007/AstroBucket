@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { GithubCredentials } from '../lib/github';
-import { Github, Key, Save } from 'lucide-react';
+import type { GithubCredentials } from '../lib/github';
+import { Key, Save } from 'lucide-react';
+import { GithubIcon as Github } from './GithubIcon';
 
 interface SettingsModalProps {
   initialCreds: Partial<GithubCredentials>;
@@ -29,9 +30,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCreds, onSa
           <h2 className="text-gradient">Connect Repository</h2>
         </div>
         
-        <p className="text-muted" style={{ marginBottom: '2rem', textAlign: 'center', fontSize: '0.9rem' }}>
-          Provide your GitHub Personal Access Token (PAT) and target repository to start using it as an S3 bucket.
-        </p>
+        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+            Provide your GitHub Personal Access Token (PAT) and target repository to start using it as an S3 bucket.
+          </p>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>
+            <strong>Note:</strong> Please use a <strong>Classic Token</strong> with the <code>repo</code> scope selected.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="input-group">
