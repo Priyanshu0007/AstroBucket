@@ -7,7 +7,7 @@ function App() {
   const [creds, setCreds] = useState<GithubCredentials | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('github-s3-creds');
+    const saved = localStorage.getItem('astrobucket-creds');
     if (saved) {
       try {
         setCreds(JSON.parse(saved));
@@ -18,12 +18,12 @@ function App() {
   }, []);
 
   const handleSaveCreds = (newCreds: GithubCredentials) => {
-    localStorage.setItem('github-s3-creds', JSON.stringify(newCreds));
+    localStorage.setItem('astrobucket-creds', JSON.stringify(newCreds));
     setCreds(newCreds);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('github-s3-creds');
+    localStorage.removeItem('astrobucket-creds');
     setCreds(null);
   };
 

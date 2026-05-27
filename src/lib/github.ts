@@ -51,7 +51,7 @@ export const uploadFile = async (
   creds: GithubCredentials,
   path: string,
   contentBase64: string,
-  message: string = 'Upload via GitHub S3 Explorer',
+  message: string = 'Upload via AstroBucket',
   sha?: string
 ) => {
   const { owner, repo, branch, token } = creds;
@@ -85,7 +85,7 @@ export const deleteFile = async (
   creds: GithubCredentials,
   path: string,
   sha: string,
-  message: string = 'Delete via GitHub S3 Explorer'
+  message: string = 'Delete via AstroBucket'
 ) => {
   const { owner, repo, branch, token } = creds;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;

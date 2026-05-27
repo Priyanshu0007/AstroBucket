@@ -166,7 +166,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ creds, onLogout }) =
       <header className="app-header">
         <div className="app-title">
           <Github size={28} />
-          <span className="text-gradient">Repo CDN Explorer</span>
+          <span className="text-gradient">AstroBucket</span>
           <span className="text-muted" style={{ fontSize: '1rem', marginLeft: '1rem' }}>
             {creds.owner} / {creds.repo}
           </span>
