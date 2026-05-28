@@ -24,7 +24,7 @@ import {
   LogOut,
   ExternalLink
 } from 'lucide-react';
-import { GithubIcon as Github } from './GithubIcon';
+import { AstroBucketLogo } from './AstroBucketLogo';
 interface FileExplorerProps {
   creds: GithubCredentials;
   onLogout: () => void;
@@ -165,7 +165,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ creds, onLogout }) =
     <div className="container">
       <header className="app-header">
         <div className="app-title">
-          <Github size={28} />
+          <AstroBucketLogo size={28} />
           <span className="text-gradient">AstroBucket</span>
           <span className="text-muted" style={{ fontSize: '1rem', marginLeft: '1rem' }}>
             {creds.owner} / {creds.repo}
