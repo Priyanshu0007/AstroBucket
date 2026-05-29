@@ -1247,9 +1247,28 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
               <h1 className="text-gradient-hero" style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.75rem' }}>
                 Storage Dashboard
               </h1>
-              <p className="text-muted" style={{ maxWidth: '600px', fontSize: '1rem', lineHeight: '1.5' }}>
+              <p className="text-muted" style={{ maxWidth: '600px', fontSize: '1rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
                 Connect your GitHub repositories to convert them into S3-like storage buckets with free, global jsDelivr edge CDN link sharing.
               </p>
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.05)',
+                border: '1px solid rgba(245, 158, 11, 0.15)',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                fontSize: '0.85rem',
+                color: '#fbbf24',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                maxWidth: '650px',
+                lineHeight: '1.4',
+                textAlign: 'left'
+              }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Tip:</strong> We recommend attaching repositories owned by a <strong>secondary/burner GitHub account</strong>. Since uploads write commits directly to your repos, this prevents polluting your primary developer account's contribution graphs and commit histories.
+                </span>
+              </div>
             </div>
 
             {/* Connected Repos Grid */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Key, Save, X, User } from 'lucide-react';
+import { Key, Save, X, User, AlertTriangle } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
 
 /**
@@ -89,9 +89,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '0.5rem', lineHeight: '1.4' }}>
             Provide your GitHub Personal Access Token (PAT) and username to start connecting your CDN buckets.
           </p>
-          <p className="text-muted" style={{ fontSize: '0.85rem', color: '#a855f7' }}>
+          <p className="text-muted" style={{ fontSize: '0.85rem', color: '#a855f7', marginBottom: '0.75rem' }}>
             <strong>Recommendation:</strong> Use a <strong>Classic Token</strong> with the <code>repo</code> scope selected.
           </p>
+          <div style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.2)',
+            borderRadius: '8px',
+            padding: '0.75rem',
+            fontSize: '0.8rem',
+            color: '#fbbf24',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            textAlign: 'left',
+            lineHeight: '1.4'
+          }}>
+            <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Note:</strong> We highly recommend using a <strong>secondary/burner GitHub account</strong>. AstroBucket commits files directly, which will alter your primary developer account's contribution graphs and commit histories.
+            </span>
+          </div>
         </div>
 
         {error && (

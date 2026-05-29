@@ -106,6 +106,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     {
       q: "Can I manage subdirectories and file organization?",
       a: "Yes. You can create folder hierarchies, drop files into specific subfolders, view and copy paths, delete assets, and review raw file configurations in real-time, just like AWS S3."
+    },
+    {
+      q: "Should I use my primary GitHub account?",
+      a: "For the cleanest setup, we recommend using a secondary or burner GitHub account. Since AstroBucket writes commits to your repositories for every file upload or deletion, using a secondary account avoids polluting your primary developer account's git history and contribution graphs."
     }
   ];
 
