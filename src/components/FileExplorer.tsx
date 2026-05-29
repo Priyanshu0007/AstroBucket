@@ -7,7 +7,8 @@ import {
   getCdnUrl,
   fileToBase64,
   fetchUserRepos,
-  fetchUserProfile
+  fetchUserProfile,
+  fetchFileRaw
 } from '../lib/github';
 import { 
   Folder, 
@@ -29,9 +30,18 @@ import {
   User,
   AlertCircle,
   X,
-  Check
+  Check,
+  Eye,
+  Grid,
+  List,
+  FileText,
+  Video,
+  Music,
+  Play,
+  Pause
 } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
+import { FilePreviewModal } from './FilePreviewModal';
 import type { GithubSession } from '../App';
 
 
@@ -45,6 +55,197 @@ export interface AttachedRepo {
   branch: string;
 }
 
+interface MediaThumbnailProps {
+  file: GithubFile;
+  creds: {
+    token: string;
+    owner: string;
+    repo: string;
+    branch: string;
+  };
+}
+
+const MediaThumbnail: React.FC<MediaThumbnailProps> = ({ file, creds }) => {
+  const [src, setSrc] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<boolean>(false);
+  const [playing, setPlaying] = useState<boolean>(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp'];
+  const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+  const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
+
+  useEffect(() => {
+    if (file.type === 'dir') return;
+
+    let active = true;
+    let localUrl = '';
+    const cdnUrl = getCdnUrl(creds.owner, creds.repo, creds.branch, file.path);
+
+    const checkAndLoad = async () => {
+      if (imageExts.includes(ext) || videoExts.includes(ext) || audioExts.includes(ext)) {
+        // Try the CDN URL first
+        try {
+          const res = await fetch(cdnUrl, { method: 'HEAD' });
+          if (res.ok && active) {
+            setSrc(cdnUrl);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // If HEAD request fails, fallback to loading via raw file fetch (e.g. private repo)
+        }
+
+        // Fallback for private repository or failed CDN
+        try {
+          const blob = await fetchFileRaw(creds, file.path);
+          if (active) {
+            localUrl = URL.createObjectURL(blob);
+            setSrc(localUrl);
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error("Failed to load thumbnail for", file.name, err);
+          if (active) {
+            setError(true);
+            setLoading(false);
+          }
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    checkAndLoad();
+
+    return () => {
+      active = false;
+      if (localUrl) {
+        URL.revokeObjectURL(localUrl);
+      }
+    };
+  }, [file.path, file.sha]);
+
+  // Clean up audio ref on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleAudioPlayToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!src) return;
+
+    if (!audioRef.current) {
+      audioRef.current = new Audio(src);
+      audioRef.current.addEventListener('ended', () => {
+        setPlaying(false);
+      });
+    }
+
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.play().catch(err => console.error("Audio playback error:", err));
+      setPlaying(true);
+    }
+  };
+
+  if (file.type === 'dir') {
+    return <Folder size={40} className="file-icon" style={{ color: 'var(--primary)' }} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="thumbnail-spinner">
+        <RefreshCw size={18} className="spin text-muted" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <FileIcon size={36} className="text-muted" style={{ opacity: 0.5 }} />;
+  }
+
+  if (imageExts.includes(ext)) {
+    return (
+      <img 
+        src={src} 
+        alt={file.name} 
+        className="file-thumbnail-img" 
+        loading="lazy"
+      />
+    );
+  }
+
+  if (videoExts.includes(ext)) {
+    return (
+      <div 
+        style={{ width: '100%', height: '100%', position: 'relative' }}
+        onMouseEnter={(e) => {
+          const video = e.currentTarget.querySelector('video');
+          if (video) video.play().catch(() => {});
+        }}
+        onMouseLeave={(e) => {
+          const video = e.currentTarget.querySelector('video');
+          if (video) {
+            video.pause();
+            video.currentTime = 0;
+          }
+        }}
+      >
+        <video 
+          src={src} 
+          className="file-thumbnail-video" 
+          muted 
+          playsInline 
+          loop 
+          preload="metadata"
+        />
+        <div className="video-preview-badge">
+          <span>PREVIEW</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (audioExts.includes(ext)) {
+    return (
+      <div className="file-thumbnail-audio">
+        <Music size={30} style={{ color: '#a855f7', opacity: playing ? 1 : 0.6 }} />
+        <button 
+          className="audio-preview-btn" 
+          onClick={handleAudioPlayToggle}
+          title={playing ? "Pause preview" : "Play preview"}
+          type="button"
+        >
+          {playing ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" style={{ marginLeft: '1px' }} />}
+        </button>
+      </div>
+    );
+  }
+
+  // Fallback for code, docx, pdf, spreadsheets, etc.
+  const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md', 'py', 'java', 'go', 'rs'];
+  const sheetExts = ['xlsx', 'xls', 'csv'];
+  const docxExts = ['docx'];
+
+  if (ext === 'pdf') return <FileText size={36} style={{ color: '#f43f5e' }} />;
+  if (sheetExts.includes(ext)) return <FileText size={36} style={{ color: '#10b981' }} />;
+  if (docxExts.includes(ext)) return <FileText size={36} style={{ color: '#3b82f6' }} />;
+  if (codeExts.includes(ext)) return <Code size={36} style={{ color: '#f59e0b' }} />;
+
+  return <FileIcon size={36} className="text-muted" />;
+};
+
+
 export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout }) => {
   const [attachedRepos, setAttachedRepos] = useState<AttachedRepo[]>([]);
   const [activeRepo, setActiveRepo] = useState<AttachedRepo | null>(null);
@@ -57,6 +258,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Drive-like states
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedFileSha, setSelectedFileSha] = useState<string | null>(null);
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState<boolean>(false);
+  const [newFolderName, setNewFolderName] = useState<string>('');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; file: GithubFile } | null>(null);
+  const [previewFile, setPreviewFile] = useState<GithubFile | null>(null);
 
   // Search filter for files in current folder
   const [fileSearch, setFileSearch] = useState('');
@@ -102,6 +311,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     loadGithubRepos();
   }, [session]);
 
+  // Click outside to clear selection / context menu
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const loadUserProfile = async () => {
     try {
       const data = await fetchUserProfile(session.token, session.owner);
@@ -131,6 +349,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       setFiles([]);
       setCurrentPath('');
     }
+    setSelectedFileSha(null);
   }, [activeRepo]);
 
   const loadContents = async (path: string = currentPath) => {
@@ -159,6 +378,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       }
     } finally {
       setLoading(false);
+      setSelectedFileSha(null);
     }
   };
 
@@ -242,6 +462,36 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     }
   };
 
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderName.trim() || !activeRepo) return;
+    
+    setLoading(true);
+    try {
+      const creds = {
+        token: session.token,
+        owner: session.owner,
+        repo: activeRepo.repo,
+        branch: activeRepo.branch
+      };
+      
+      const folderPath = currentPath 
+        ? `${currentPath}/${newFolderName.trim()}/.gitkeep` 
+        : `${newFolderName.trim()}/.gitkeep`;
+        
+      // Upload empty file content (base64 of empty string is "")
+      await uploadFile(creds, folderPath, "", `Create folder ${newFolderName.trim()}`);
+      setNewFolderName('');
+      setIsCreateFolderOpen(false);
+      await loadContents();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Failed to create folder: ${err.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNavigate = (path: string) => {
     loadContents(path);
   };
@@ -298,8 +548,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       const existingFile = files.find(f => f.name === file.name);
       if (existingFile) {
          if (!confirm(`File "${file.name}" already exists. Overwrite?`)) {
-           setUploading(false);
-           return;
+            setUploading(false);
+            return;
          }
          sha = existingFile.sha;
       }
@@ -340,16 +590,46 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     }
   };
 
-  const getFileIcon = (file: GithubFile) => {
-    if (file.type === 'dir') return <Folder size={30} className="file-icon" />;
+  const handleContextMenu = (e: React.MouseEvent, file: GithubFile) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedFileSha(file.sha);
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      file
+    });
+  };
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0 || !bytes) return '—';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+
+  const getListFileIcon = (file: GithubFile) => {
+    if (file.type === 'dir') return <Folder size={18} style={{ color: 'var(--primary)' }} />;
     
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
-    const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md'];
-    
-    if (imageExts.includes(ext || '')) return <ImageIcon size={30} className="file-icon" style={{ color: '#60a5fa' }} />;
-    if (codeExts.includes(ext || '')) return <Code size={30} className="file-icon" style={{ color: '#a855f7' }} />;
-    return <FileIcon size={30} className="file-icon" />;
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
+    const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+    const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
+    const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md', 'py', 'java', 'go', 'rs'];
+    const sheetExts = ['xlsx', 'xls', 'csv'];
+    const docxExts = ['docx'];
+
+    if (imageExts.includes(ext)) return <ImageIcon size={18} style={{ color: '#38bdf8' }} />;
+    if (videoExts.includes(ext)) return <Video size={18} style={{ color: '#ec4899' }} />;
+    if (audioExts.includes(ext)) return <Music size={18} style={{ color: '#a855f7' }} />;
+    if (ext === 'pdf') return <FileText size={18} style={{ color: '#f43f5e' }} />;
+    if (sheetExts.includes(ext)) return <FileText size={18} style={{ color: '#10b981' }} />;
+    if (docxExts.includes(ext)) return <FileText size={18} style={{ color: '#3b82f6' }} />;
+    if (codeExts.includes(ext)) return <Code size={18} style={{ color: '#f59e0b' }} />;
+    return <FileIcon size={18} />;
   };
 
   const breadcrumbParts = currentPath.split('/').filter(Boolean);
@@ -530,8 +810,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
             </div>
 
             {/* File List Controls */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem' }}>
-              <div className="search-bar-wrapper" style={{ flex: 1, maxWidth: '400px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+              <div className="search-bar-wrapper" style={{ flex: 1, maxWidth: '400px', minWidth: '200px' }}>
                 <Search size={16} className="search-bar-icon" />
                 <input 
                   type="text" 
@@ -546,9 +826,34 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                   </button>
                 )}
               </div>
-              <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-                {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
-              </span>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* View Mode Toggle */}
+                <div className="view-mode-toggle glass-card" style={{ display: 'flex', padding: '2px', gap: '2px' }}>
+                  <button 
+                    className={`btn-icon ${viewMode === 'grid' ? 'active-toggle' : ''}`} 
+                    onClick={() => setViewMode('grid')}
+                    title="Grid View"
+                    style={{ padding: '0.35rem' }}
+                  >
+                    <Grid size={15} />
+                  </button>
+                  <button 
+                    className={`btn-icon ${viewMode === 'list' ? 'active-toggle' : ''}`} 
+                    onClick={() => setViewMode('list')}
+                    title="List View"
+                    style={{ padding: '0.35rem' }}
+                  >
+                    <List size={15} />
+                  </button>
+                </div>
+
+                <button className="btn btn-primary" onClick={() => setIsCreateFolderOpen(true)}>
+                  <Plus size={16} /> New Folder
+                </button>
+                <span className="text-muted" style={{ fontSize: '0.85rem', marginLeft: '0.5rem' }}>
+                  {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
             {/* File Listing Container */}
@@ -557,57 +862,197 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                 <RefreshCw size={28} className="spin text-muted" />
               </div>
             ) : (
-              <div className="file-grid">
-                {filteredFiles.map((file) => (
-                  <div className="file-item glass-card" key={file.sha}>
-                    {file.type === 'dir' ? (
-                      <div 
-                        style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
-                        onClick={() => handleNavigate(file.path)}
-                      >
-                        {getFileIcon(file)}
-                        <div className="file-name" style={{ marginTop: '0.5rem' }}>{file.name}</div>
-                      </div>
-                    ) : (
-                      <>
-                        {getFileIcon(file)}
-                        <div className="file-name">{file.name}</div>
-                        <div className="file-actions">
-                          <button 
-                            className="btn-icon" 
-                            onClick={() => handleCopyCdn(file)}
-                            title="Copy CDN Link"
-                          >
-                            <Copy size={15} />
-                          </button>
-                          <a 
-                            href={file.html_url} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            className="btn-icon"
-                            title="View on GitHub"
-                          >
-                            <ExternalLink size={15} />
-                          </a>
-                          <button 
-                            className="btn-icon" 
-                            style={{ color: 'var(--danger)' }} 
-                            onClick={() => handleDelete(file)}
-                            title="Delete File"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+              <>
+                {viewMode === 'grid' ? (
+                  /* GRID VIEW */
+                  <div className="file-grid">
+                    {filteredFiles.map((file) => {
+                      const isSelected = selectedFileSha === file.sha;
+                      return (
+                        <div 
+                          className={`file-item glass-card ${isSelected ? 'selected' : ''}`} 
+                          key={file.sha}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFileSha(file.sha);
+                          }}
+                          onDoubleClick={() => {
+                            if (file.type === 'dir') {
+                              handleNavigate(file.path);
+                            } else {
+                              setPreviewFile(file);
+                            }
+                          }}
+                          onContextMenu={(e) => handleContextMenu(e, file)}
+                        >
+                          <div className="file-thumbnail-container">
+                            <MediaThumbnail 
+                              file={file} 
+                              creds={{
+                                token: session.token,
+                                owner: session.owner,
+                                repo: activeRepo.repo,
+                                branch: activeRepo.branch
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="file-details">
+                            <div className="file-name" title={file.name}>{file.name}</div>
+                            <div className="file-meta-info">
+                              <span>{file.type === 'dir' ? 'Folder' : (file.name.split('.').pop() || '').toUpperCase()}</span>
+                              <span>{file.type === 'dir' ? '—' : formatBytes(file.size)}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="file-actions">
+                            {file.type === 'file' && (
+                              <button 
+                                className="btn-icon" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewFile(file);
+                                }}
+                                title="Preview File"
+                              >
+                                <Eye size={15} />
+                              </button>
+                            )}
+                            <button 
+                              className="btn-icon" 
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyCdn(file);
+                              }}
+                              title="Copy CDN Link"
+                            >
+                              <Copy size={15} />
+                            </button>
+                            <button 
+                              className="btn-icon" 
+                              style={{ color: 'var(--danger)' }} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(file);
+                              }}
+                              title="Delete File"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </div>
-                      </>
+                      );
+                    })}
+                    {filteredFiles.length === 0 && (
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '5rem', color: 'var(--text-muted)' }}>
+                        No files or directories found.
+                      </div>
                     )}
                   </div>
-                ))}
-                {filteredFiles.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '5rem', color: 'var(--text-muted)' }}>
-                    No files or directories found.
+                ) : (
+                  /* LIST VIEW */
+                  <div className="file-list-view glass-panel">
+                    <table className="file-list-table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Type</th>
+                          <th>Size</th>
+                          <th style={{ textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredFiles.map((file) => {
+                          const isSelected = selectedFileSha === file.sha;
+                          const ext = file.name.split('.').pop()?.toUpperCase() || '';
+                          const displayType = file.type === 'dir' ? 'Folder' : `${ext} File`;
+                          return (
+                            <tr 
+                              key={file.sha} 
+                              className={isSelected ? 'selected' : ''}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFileSha(file.sha);
+                              }}
+                              onDoubleClick={() => {
+                                if (file.type === 'dir') {
+                                  handleNavigate(file.path);
+                                } else {
+                                  setPreviewFile(file);
+                                }
+                              }}
+                              onContextMenu={(e) => handleContextMenu(e, file)}
+                            >
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  {getListFileIcon(file)}
+                                  <span className="file-list-name-text">{file.name}</span>
+                                </div>
+                              </td>
+                              <td className="text-muted">{displayType}</td>
+                              <td className="text-muted">{file.type === 'dir' ? '—' : formatBytes(file.size)}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                                  {file.type === 'file' && (
+                                    <button 
+                                      className="btn-icon" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewFile(file);
+                                      }}
+                                      title="Preview File"
+                                    >
+                                      <Eye size={14} />
+                                    </button>
+                                  )}
+                                  <button 
+                                    className="btn-icon" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyCdn(file);
+                                    }}
+                                    title="Copy CDN"
+                                  >
+                                    <Copy size={14} />
+                                  </button>
+                                  <a 
+                                    href={file.html_url} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="btn-icon"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="View on GitHub"
+                                  >
+                                    <ExternalLink size={14} />
+                                  </a>
+                                  <button 
+                                    className="btn-icon" 
+                                    style={{ color: 'var(--danger)' }} 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(file);
+                                    }}
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredFiles.length === 0 && (
+                          <tr>
+                            <td colSpan={4} style={{ textAlign: 'center', padding: '5rem', color: 'var(--text-muted)' }}>
+                              No files or directories found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         ) : (
@@ -780,6 +1225,109 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
           </div>
         )}
       </main>
+
+      {/* Folder Creation Modal */}
+      {isCreateFolderOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Create New Folder</h2>
+              <button className="btn-icon" onClick={() => setIsCreateFolderOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateFolder}>
+              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="input-label">Folder Name</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. assets" 
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', justifySelf: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setIsCreateFolderOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Create Folder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <div 
+          className="context-menu glass-panel" 
+          style={{ 
+            position: 'fixed',
+            top: contextMenu.y, 
+            left: contextMenu.x,
+            zIndex: 1000 
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.file.type === 'file' && (
+            <button 
+              className="context-menu-item" 
+              onClick={() => {
+                setPreviewFile(contextMenu.file);
+                setContextMenu(null);
+              }}
+            >
+              <Eye size={14} /> Preview File
+            </button>
+          )}
+          <button 
+            className="context-menu-item" 
+            onClick={() => {
+              handleCopyCdn(contextMenu.file);
+              setContextMenu(null);
+            }}
+          >
+            <Copy size={14} /> Copy CDN Link
+          </button>
+          <a 
+            href={contextMenu.file.html_url} 
+            target="_blank" 
+            rel="noreferrer"
+            className="context-menu-item-link"
+            onClick={() => setContextMenu(null)}
+          >
+            <ExternalLink size={14} /> Open on GitHub
+          </a>
+          <div className="context-menu-divider" />
+          <button 
+            className="context-menu-item text-danger" 
+            onClick={() => {
+              handleDelete(contextMenu.file);
+              setContextMenu(null);
+            }}
+          >
+            <Trash2 size={14} /> Delete
+          </button>
+        </div>
+      )}
+
+      {/* Media Carousel Preview Modal */}
+      {previewFile && activeRepo && (
+        <FilePreviewModal 
+          isOpen={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+          file={previewFile}
+          files={files}
+          onNavigateToFile={(file) => setPreviewFile(file)}
+          session={session}
+          activeRepo={activeRepo}
+        />
+      )}
 
       {/* Glowing Toast Notification on Copy success */}
       {copiedFileUrl && (

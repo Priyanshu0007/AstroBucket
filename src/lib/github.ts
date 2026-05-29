@@ -44,8 +44,31 @@ export const fetchContents = async (
   }
   
   const data = await response.json();
-  return Array.isArray(data) ? data : [data];
+  const filesList = Array.isArray(data) ? data : [data];
+  return filesList.filter((file: GithubFile) => file.name !== '.gitkeep');
 };
+
+export const fetchFileRaw = async (
+  creds: GithubCredentials,
+  path: string
+): Promise<Blob> => {
+  const { owner, repo, branch, token } = creds;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      ...getHeaders(token),
+      Accept: 'application/vnd.github.v3.raw',
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file content: ${response.statusText}`);
+  }
+  
+  return response.blob();
+};
+
 
 export const uploadFile = async (
   creds: GithubCredentials,
