@@ -8,7 +8,8 @@ import {
   fileToBase64,
   fetchUserRepos,
   fetchUserProfile,
-  fetchFileRaw
+  fetchFileRaw,
+  fetchRepoTree
 } from '../lib/github';
 import { 
   Folder, 
@@ -38,12 +39,83 @@ import {
   Video,
   Music,
   Play,
-  Pause
+  Pause,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
 import { FilePreviewModal } from './FilePreviewModal';
 import type { GithubSession } from '../App';
 
+interface UploadQueueItem {
+  id: string;
+  name: string;
+  relativePath: string;
+  size: number;
+  progress: number;
+  status: 'pending' | 'uploading' | 'completed' | 'failed';
+  error?: string;
+  file: File;
+  uploadedBytes?: number;
+  startTime?: number;
+}
+
+const getFilesFromEntry = async (entry: any): Promise<{ file: File; relativePath: string }[]> => {
+  if (entry.isFile) {
+    return new Promise((resolve) => {
+      entry.file((file: File) => {
+        const cleanPath = entry.fullPath.startsWith('/') 
+          ? entry.fullPath.substring(1) 
+          : entry.fullPath;
+        resolve([{ file, relativePath: cleanPath }]);
+      });
+    });
+  } else if (entry.isDirectory) {
+    const dirReader = entry.createReader();
+    const readEntries = (): Promise<any[]> => {
+      return new Promise((resolve, reject) => {
+        dirReader.readEntries(resolve, reject);
+      });
+    };
+
+    try {
+      let entries: any[] = [];
+      let readBatch = await readEntries();
+      while (readBatch.length > 0) {
+        entries = entries.concat(readBatch);
+        readBatch = await readEntries();
+      }
+
+      const results = await Promise.all(
+        entries.map((childEntry) => getFilesFromEntry(childEntry))
+      );
+      return results.flat();
+    } catch (err) {
+      console.error('Error reading directory entries', err);
+      return [];
+    }
+  }
+  return [];
+};
+
+const parseDroppedItems = async (items: DataTransferItemList): Promise<{ file: File; relativePath: string }[]> => {
+  const entries: any[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.kind === 'file') {
+      const entry = item.webkitGetAsEntry();
+      if (entry) {
+        entries.push(entry);
+      }
+    }
+  }
+
+  if (entries.length > 0) {
+    const fileLists = await Promise.all(entries.map(entry => getFilesFromEntry(entry)));
+    return fileLists.flat();
+  }
+  return [];
+};
 
 interface FileExplorerProps {
   session: GithubSession;
@@ -259,6 +331,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Batch upload states
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const [showProgressPanel, setShowProgressPanel] = useState<boolean>(false);
+  const [isPanelMinimized, setIsPanelMinimized] = useState<boolean>(false);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+
   // Drive-like states
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedFileSha, setSelectedFileSha] = useState<string | null>(null);
@@ -283,6 +361,18 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
 
   // Copy success notification state
   const [copiedFileUrl, setCopiedFileUrl] = useState<string | null>(null);
+
+  // Elapsed time tracker for speed calculations
+  useEffect(() => {
+    let timer: any;
+    const isUploading = uploadQueue.some(item => item.status === 'uploading');
+    if (isUploading) {
+      timer = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [uploadQueue]);
 
   // Load attached repositories and active repository on mount
   useEffect(() => {
@@ -537,56 +627,149 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     }
   };
 
-  const processFile = async (file: File) => {
+  const startBatchUpload = async (filesToUpload: { file: File; relativePath: string }[]) => {
     if (!activeRepo) return;
+    
+    setElapsedTime(0);
     setUploading(true);
+    setShowProgressPanel(true);
+    setIsPanelMinimized(false);
+
+    const newItems: UploadQueueItem[] = filesToUpload.map(item => ({
+      id: Math.random().toString(36).substring(2, 9),
+      name: item.file.name,
+      relativePath: item.relativePath,
+      size: item.file.size,
+      progress: 0,
+      status: 'pending',
+      file: item.file
+    }));
+    
+    setUploadQueue(newItems);
+    
+    const creds = {
+      token: session.token,
+      owner: session.owner,
+      repo: activeRepo.repo,
+      branch: activeRepo.branch
+    };
+    
+    let shaMap: Record<string, string> = {};
     try {
-      const base64 = await fileToBase64(file);
-      const filePath = currentPath ? `${currentPath}/${file.name}` : file.name;
-      
-      let sha = undefined;
-      const existingFile = files.find(f => f.name === file.name);
-      if (existingFile) {
-         if (!confirm(`File "${file.name}" already exists. Overwrite?`)) {
-            setUploading(false);
-            return;
-         }
-         sha = existingFile.sha;
-      }
-      
-      const creds = {
-        token: session.token,
-        owner: session.owner,
-        repo: activeRepo.repo,
-        branch: activeRepo.branch
-      };
-      await uploadFile(creds, filePath, base64, `Upload ${file.name}`, sha);
-      await loadContents();
-    } catch (err: any) {
-      console.error(err);
-      if (err?.message?.includes('Resource not accessible')) {
-        alert('GitHub Token Error: Your Personal Access Token does not have write access. Please ensure your token has "Contents: Read and write" repository permissions.');
-      } else {
-        alert(`Failed to upload file: ${err.message || 'Unknown error'}`);
-      }
-    } finally {
-      setUploading(false);
+      const tree = await fetchRepoTree(creds);
+      tree.forEach(node => {
+        if (node.type === 'blob') {
+          shaMap[node.path] = node.sha;
+        }
+      });
+    } catch (err) {
+      console.error('Error fetching tree, proceeding without SHA map:', err);
     }
+
+    const updateItemStatus = (id: string, updates: Partial<UploadQueueItem>) => {
+      setUploadQueue(prev => prev.map(item => {
+        if (item.id === id) {
+          return { ...item, ...updates };
+        }
+        return item;
+      }));
+    };
+
+    const maxConcurrency = 3;
+    let activeIndex = 0;
+
+    const uploadSingleFile = async (item: UploadQueueItem) => {
+      const finalPath = currentPath 
+        ? `${currentPath}/${item.relativePath}` 
+        : item.relativePath;
+        
+      updateItemStatus(item.id, { status: 'uploading', startTime: Date.now() });
+      
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += Math.min(5, (90 - progress) / 5);
+        updateItemStatus(item.id, { progress: Math.floor(progress) });
+      }, 150);
+
+      try {
+        const base64 = await fileToBase64(item.file);
+        const sha = shaMap[finalPath];
+        
+        await uploadFile(creds, finalPath, base64, `Upload ${item.name}`, sha);
+        
+        clearInterval(progressInterval);
+        updateItemStatus(item.id, { 
+          status: 'completed', 
+          progress: 100, 
+          uploadedBytes: item.size 
+        });
+      } catch (err: any) {
+        clearInterval(progressInterval);
+        console.error(`Failed to upload ${item.name}:`, err);
+        updateItemStatus(item.id, { 
+          status: 'failed', 
+          progress: 0, 
+          error: err.message || 'Upload failed' 
+        });
+      }
+    };
+
+    const worker = async () => {
+      while (activeIndex < newItems.length) {
+        const index = activeIndex++;
+        if (index >= newItems.length) break;
+        await uploadSingleFile(newItems[index]);
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(maxConcurrency, newItems.length); i++) {
+      workers.push(worker());
+    }
+    
+    await Promise.all(workers);
+    
+    setUploading(false);
+    await loadContents();
   };
 
-  const handleFileDrop = (e: React.DragEvent) => {
+  const handleFileDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
+    if (!activeRepo || uploading) return;
+    
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      try {
+        const filesList = await parseDroppedItems(e.dataTransfer.items);
+        if (filesList.length > 0) {
+          startBatchUpload(filesList);
+        }
+      } catch (err) {
+        console.error('Error scanning dropped files:', err);
+      }
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesList = Array.from(e.dataTransfer.files).map(file => ({
+        file,
+        relativePath: file.name
+      }));
+      startBatchUpload(filesList);
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
+    if (uploading) return;
+    if (e.target.files && e.target.files.length > 0) {
+      const filesList = Array.from(e.target.files).map(file => ({
+        file,
+        relativePath: file.name
+      }));
+      startBatchUpload(filesList);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -797,14 +980,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                 style={{ display: 'none' }} 
                 ref={fileInputRef} 
                 onChange={handleFileInput}
+                multiple
               />
               <Upload size={40} className={uploading ? 'spin' : ''} style={{ color: uploading ? 'var(--primary)' : 'var(--text-muted)' }} />
               {uploading ? (
-                <h3 className="text-primary" style={{ fontSize: '1.1rem' }}>Uploading asset...</h3>
+                <h3 className="text-primary" style={{ fontSize: '1.1rem' }}>Uploading files... (see progress panel)</h3>
               ) : (
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Drag & Drop to upload files</h3>
-                  <p className="text-muted" style={{ fontSize: '0.85rem' }}>or click to select from your machine</p>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Drag & Drop to upload files or folders</h3>
+                  <p className="text-muted" style={{ fontSize: '0.85rem' }}>or click to select multiple files from your machine</p>
                 </div>
               )}
             </div>
@@ -1341,6 +1525,160 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
               </span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Upload Progress Panel */}
+      {showProgressPanel && (
+        <div className={`upload-progress-panel glass-panel ${isPanelMinimized ? 'minimized' : ''}`}>
+          <div className="upload-progress-header" onClick={() => setIsPanelMinimized(!isPanelMinimized)}>
+            <div className="upload-progress-title">
+              {uploadQueue.some(i => i.status === 'uploading') ? (
+                <>
+                  <RefreshCw size={14} className="spin text-primary" />
+                  <span>Uploading {uploadQueue.filter(i => i.status === 'completed').length + uploadQueue.filter(i => i.status === 'uploading').length}/{uploadQueue.length} files...</span>
+                </>
+              ) : uploadQueue.some(i => i.status === 'failed') ? (
+                <>
+                  <AlertCircle size={14} className="text-danger" />
+                  <span>Upload completed with errors</span>
+                </>
+              ) : (
+                <>
+                  <Check size={14} className="text-success" />
+                  <span>Upload queue complete</span>
+                </>
+              )}
+            </div>
+            <div className="upload-progress-controls" onClick={(e) => e.stopPropagation()}>
+              <button 
+                className="btn-icon" 
+                onClick={() => setIsPanelMinimized(!isPanelMinimized)} 
+                title={isPanelMinimized ? "Expand" : "Minimize"}
+                style={{ padding: '4px' }}
+              >
+                {isPanelMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
+              </button>
+              {!uploadQueue.some(i => i.status === 'uploading') && (
+                <button 
+                  className="btn-icon" 
+                  onClick={() => setShowProgressPanel(false)} 
+                  title="Close"
+                  style={{ padding: '4px' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {!isPanelMinimized && (
+            <div className="upload-progress-body">
+              {(() => {
+                const totalSize = uploadQueue.reduce((acc, item) => acc + item.size, 0);
+                const totalUploadedBytes = uploadQueue.reduce((acc, item) => {
+                  if (item.status === 'completed') return acc + item.size;
+                  if (item.status === 'uploading') return acc + (item.size * (item.progress / 100));
+                  return acc;
+                }, 0);
+                const overallProgress = totalSize > 0 ? Math.round((totalUploadedBytes / totalSize) * 100) : 0;
+                const speed = elapsedTime > 0 ? totalUploadedBytes / elapsedTime : 0;
+                
+                const formatSpeed = (bytesPerSecond: number) => {
+                  if (bytesPerSecond === 0) return '—';
+                  if (bytesPerSecond < 1024) return `${bytesPerSecond.toFixed(0)} B/s`;
+                  if (bytesPerSecond < 1024 * 1024) return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+                  return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+                };
+
+                const getETA = () => {
+                  const remainingBytes = totalSize - totalUploadedBytes;
+                  if (remainingBytes <= 0) return '0s';
+                  if (speed <= 0) return 'Calculating...';
+                  const seconds = Math.ceil(remainingBytes / speed);
+                  if (seconds < 60) return `${seconds}s`;
+                  const minutes = Math.floor(seconds / 60);
+                  const remSeconds = seconds % 60;
+                  return `${minutes}m ${remSeconds}s`;
+                };
+
+                const getQueueFileIcon = (fileName: string) => {
+                  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+                  const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
+                  const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+                  const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
+                  const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md', 'py', 'java', 'go', 'rs'];
+                  const sheetExts = ['xlsx', 'xls', 'csv'];
+                  const docxExts = ['docx'];
+
+                  if (imageExts.includes(ext)) return <ImageIcon size={14} style={{ color: '#38bdf8' }} />;
+                  if (videoExts.includes(ext)) return <Video size={14} style={{ color: '#ec4899' }} />;
+                  if (audioExts.includes(ext)) return <Music size={14} style={{ color: '#a855f7' }} />;
+                  if (ext === 'pdf') return <FileText size={14} style={{ color: '#f43f5e' }} />;
+                  if (sheetExts.includes(ext)) return <FileText size={14} style={{ color: '#10b981' }} />;
+                  if (docxExts.includes(ext)) return <FileText size={14} style={{ color: '#3b82f6' }} />;
+                  if (codeExts.includes(ext)) return <Code size={14} style={{ color: '#f59e0b' }} />;
+                  return <FileIcon size={14} />;
+                };
+
+                return (
+                  <>
+                    <div className="overall-progress-info">
+                      <div className="overall-stats-text">
+                        <span>{formatBytes(totalUploadedBytes)} of {formatBytes(totalSize)}</span>
+                        <span>{overallProgress}%</span>
+                      </div>
+                      <div className="progress-bar-container">
+                        <div className="progress-bar-fill" style={{ width: `${overallProgress}%` }}></div>
+                      </div>
+                      <div className="overall-stats-text" style={{ marginTop: '2px' }}>
+                        <span>Speed: {formatSpeed(speed)}</span>
+                        {uploadQueue.some(i => i.status === 'uploading') && <span>ETA: {getETA()}</span>}
+                      </div>
+                    </div>
+                    
+                    <div className="upload-queue-list">
+                      {uploadQueue.map((item) => (
+                        <div className="queue-item" key={item.id}>
+                          <div className="queue-item-icon-wrapper">
+                            {getQueueFileIcon(item.name)}
+                          </div>
+                          <div className="queue-item-details">
+                            <div className="queue-item-name" title={item.relativePath || item.name}>
+                              {item.relativePath || item.name}
+                            </div>
+                            <div className="queue-item-meta">
+                              <span>{formatBytes(item.size)}</span>
+                              {item.status === 'uploading' && <span>{item.progress}%</span>}
+                              {item.status === 'completed' && <span className="status-badge-completed">Completed</span>}
+                              {item.status === 'failed' && <span className="status-badge-failed" title={item.error}>Failed</span>}
+                              {item.status === 'pending' && <span>Queued</span>}
+                            </div>
+                          </div>
+                          
+                          <div className="queue-item-status-wrapper" title={item.status === 'failed' ? item.error : undefined}>
+                            {item.status === 'uploading' && <RefreshCw size={12} className="spin status-badge-uploading" />}
+                            {item.status === 'completed' && <Check size={12} className="status-badge-completed" />}
+                            {item.status === 'failed' && <AlertCircle size={12} className="status-badge-failed" />}
+                          </div>
+                          
+                          {item.status === 'uploading' && (
+                            <div className="queue-item-progress-bar" style={{ width: `${item.progress}%` }}></div>
+                          )}
+                          {item.status === 'completed' && (
+                            <div className="queue-item-progress-bar completed" style={{ width: '100%' }}></div>
+                          )}
+                          {item.status === 'failed' && (
+                            <div className="queue-item-progress-bar failed" style={{ width: '100%' }}></div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
     </div>

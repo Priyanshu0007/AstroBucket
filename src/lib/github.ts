@@ -229,3 +229,17 @@ export const fetchUserProfile = async (token: string, owner: string): Promise<Gi
     html_url: data.html_url
   };
 };
+
+export const fetchRepoTree = async (
+  creds: GithubCredentials
+): Promise<{ path: string; sha: string; type: string }[]> => {
+  const { owner, repo, branch, token } = creds;
+  const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
+  const response = await fetch(url, { headers: getHeaders(token) });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch repo tree: ${response.statusText}`);
+  }
+  const data = await response.json();
+  return data.tree || [];
+};
+
