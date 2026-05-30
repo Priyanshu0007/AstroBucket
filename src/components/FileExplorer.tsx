@@ -1912,6 +1912,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
           onNavigateToFile={(file) => setPreviewFile(file)}
           session={session}
           activeRepo={activeRepo}
+          onFileModified={() => {
+            loadContents();
+            loadRepoTree();
+          }}
         />
       )}
 

@@ -34,7 +34,7 @@ export const fetchContents = async (
   const { owner, repo, branch, token } = creds;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
   
-  const response = await fetch(url, { headers: getHeaders(token) });
+  const response = await fetch(url, { headers: getHeaders(token), cache: 'no-store' });
   
   if (!response.ok) {
     if (response.status === 404) {
@@ -60,6 +60,7 @@ export const fetchFileRaw = async (
       ...getHeaders(token),
       Accept: 'application/vnd.github.v3.raw',
     },
+    cache: 'no-store',
   });
   
   if (!response.ok) {
@@ -94,6 +95,7 @@ export const uploadFile = async (
     method: 'PUT',
     headers: getHeaders(token),
     body: JSON.stringify(body),
+    cache: 'no-store',
   });
   
   if (!response.ok) {
@@ -121,6 +123,7 @@ export const deleteFile = async (
       sha,
       branch,
     }),
+    cache: 'no-store',
   });
   
   if (!response.ok) {
