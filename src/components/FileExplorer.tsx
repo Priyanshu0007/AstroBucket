@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GithubFile, GithubRepo, GithubProfile } from '../lib/github';
+import type { GithubFile, GithubRepo, GithubProfile, GithubTreeItem } from '../lib/github';
 import { 
   fetchContents, 
   uploadFile, 
@@ -41,7 +41,12 @@ import {
   Play,
   Pause,
   Minimize2,
-  Maximize2
+  Maximize2,
+  BarChart2,
+  HardDrive,
+  Database,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -362,6 +367,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   // Copy success notification state
   const [copiedFileUrl, setCopiedFileUrl] = useState<string | null>(null);
 
+  // Analytics Dashboard states
+  const [activeTab, setActiveTab] = useState<'explorer' | 'analytics'>('explorer');
+  const [repoTree, setRepoTree] = useState<GithubTreeItem[]>([]);
+  const [loadingTree, setLoadingTree] = useState<boolean>(false);
+  const [treeError, setTreeError] = useState<string | null>(null);
+
   // Elapsed time tracker for speed calculations
   useEffect(() => {
     let timer: any;
@@ -431,15 +442,40 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     }
   };
 
+  const loadRepoTree = async (targetRepo: AttachedRepo | null = activeRepo) => {
+    if (!targetRepo) return;
+    setLoadingTree(true);
+    setTreeError(null);
+    try {
+      const creds = {
+        token: session.token,
+        owner: session.owner,
+        repo: targetRepo.repo,
+        branch: targetRepo.branch
+      };
+      const tree = await fetchRepoTree(creds);
+      setRepoTree(tree);
+    } catch (err: any) {
+      console.error('Failed to load repository tree:', err);
+      setTreeError(err.message || 'Failed to scan repository files recursively.');
+    } finally {
+      setLoadingTree(false);
+    }
+  };
+
   // Whenever activeRepo changes, load files
   useEffect(() => {
     if (activeRepo) {
       loadContents('');
+      loadRepoTree(activeRepo);
     } else {
       setFiles([]);
       setCurrentPath('');
+      setRepoTree([]);
     }
     setSelectedFileSha(null);
+    setActiveTab('explorer');
+    setTreeError(null);
   }, [activeRepo]);
 
   const loadContents = async (path: string = currentPath) => {
@@ -574,6 +610,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       setNewFolderName('');
       setIsCreateFolderOpen(false);
       await loadContents();
+      loadRepoTree();
     } catch (err: any) {
       console.error(err);
       alert(`Failed to create folder: ${err.message || 'Unknown error'}`);
@@ -615,6 +652,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         };
         await deleteFile(creds, file.path, file.sha);
         await loadContents();
+        loadRepoTree();
       } catch (err: any) {
         console.error(err);
         if (err?.message?.includes('Resource not accessible')) {
@@ -731,6 +769,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     
     setUploading(false);
     await loadContents();
+    loadRepoTree();
   };
 
   const handleFileDrop = async (e: React.DragEvent) => {
@@ -825,6 +864,64 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   const filteredRepos = githubRepos.filter(r => 
     r.name.toLowerCase().includes(repoSearch.toLowerCase())
   );
+
+  // Analytics Calculations
+  const activeRepoDetails = githubRepos.find(r => r.name.toLowerCase() === activeRepo?.repo.toLowerCase());
+  const isPrivate = activeRepoDetails ? activeRepoDetails.private : false;
+
+  const totalSizeBytes = repoTree
+    .filter(item => item.type === 'blob')
+    .reduce((acc, item) => acc + (item.size || 0), 0);
+
+  const totalFiles = repoTree.filter(item => item.type === 'blob').length;
+  const totalFolders = repoTree.filter(item => item.type === 'tree').length;
+  const averageFileSize = totalFiles > 0 ? totalSizeBytes / totalFiles : 0;
+  const storageLimitBytes = 1024 * 1024 * 1024; // 1 GB recommended
+  const storagePercentage = Math.min(100, parseFloat(((totalSizeBytes / storageLimitBytes) * 100).toFixed(2)));
+
+  const categories = [
+    { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff'], color: '#38bdf8', bgClass: 'bg-images' },
+    { name: 'Videos & Audio', extensions: ['mp4', 'webm', 'mov', 'avi', 'mkv', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], color: '#ec4899', bgClass: 'bg-media' },
+    { name: 'Code & Scripts', extensions: ['html', 'js', 'ts', 'jsx', 'tsx', 'json', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'sh', 'php', 'rb', 'sql'], color: '#f59e0b', bgClass: 'bg-code' },
+    { name: 'Stylesheets', extensions: ['css', 'scss', 'sass', 'less'], color: '#10b981', bgClass: 'bg-styles' },
+    { name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'txt', 'md', 'pptx', 'ppt', 'zip', 'tar', 'gz'], color: '#3b82f6', bgClass: 'bg-docs' },
+    { name: 'Others', extensions: [], color: '#6b7280', bgClass: 'bg-others' }
+  ];
+
+  const distribution = categories.map(cat => ({
+    name: cat.name,
+    color: cat.color,
+    count: 0,
+    size: 0,
+    percentage: 0
+  }));
+
+  repoTree.forEach(item => {
+    if (item.type !== 'blob') return;
+    const ext = item.path.split('.').pop()?.toLowerCase() || '';
+    let found = false;
+    for (let i = 0; i < categories.length - 1; i++) {
+      if (categories[i].extensions.includes(ext)) {
+        distribution[i].count++;
+        distribution[i].size += (item.size || 0);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      distribution[categories.length - 1].count++;
+      distribution[categories.length - 1].size += (item.size || 0);
+    }
+  });
+
+  distribution.forEach(d => {
+    d.percentage = totalSizeBytes > 0 ? parseFloat(((d.size / totalSizeBytes) * 100).toFixed(1)) : 0;
+  });
+
+  const largestFiles = [...repoTree]
+    .filter(item => item.type === 'blob')
+    .sort((a, b) => (b.size || 0) - (a.size || 0))
+    .slice(0, 10);
 
   return (
     <div className="dashboard-layout">
@@ -928,7 +1025,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button className="btn btn-outline" onClick={() => loadContents()} disabled={loading || uploading}>
+                <button className="btn btn-outline" onClick={() => { loadContents(); loadRepoTree(); }} disabled={loading || uploading}>
                   <RefreshCw size={16} className={loading ? 'spin' : ''} /> Refresh
                 </button>
                 <a 
@@ -942,13 +1039,33 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
               </div>
             </header>
 
-            {/* Breadcrumbs Navigation */}
-            <div className="breadcrumbs">
-              <div 
-                className={`breadcrumb-item ${breadcrumbParts.length === 0 ? 'breadcrumb-active' : ''}`}
-                onClick={() => loadContents('')}
-                style={{ display: 'flex', alignItems: 'center' }}
+            {/* Workspace tabs */}
+            <div className="workspace-tabs-container glass-panel">
+              <button 
+                className={`workspace-tab ${activeTab === 'explorer' ? 'active' : ''}`}
+                onClick={() => setActiveTab('explorer')}
               >
+                <Folder size={14} />
+                <span>Bucket Explorer</span>
+              </button>
+              <button 
+                className={`workspace-tab ${activeTab === 'analytics' ? 'active' : ''}`}
+                onClick={() => setActiveTab('analytics')}
+              >
+                <BarChart2 size={14} />
+                <span>Storage Analytics</span>
+              </button>
+            </div>
+
+            {activeTab === 'explorer' ? (
+              <>
+                {/* Breadcrumbs Navigation */}
+                <div className="breadcrumbs">
+                  <div 
+                    className={`breadcrumb-item ${breadcrumbParts.length === 0 ? 'breadcrumb-active' : ''}`}
+                    onClick={() => loadContents('')}
+                    style={{ display: 'flex', alignItems: 'center' }}
+                  >
                 <Home size={14} style={{ marginRight: '4px' }}/> Root
               </div>
               
@@ -1238,7 +1355,273 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                 )}
               </>
             )}
+          </>
+        ) : (
+          <div className="analytics-dashboard-container animate-fade-in">
+            {loadingTree ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6rem', gap: '1rem' }}>
+                <RefreshCw size={28} className="spin text-primary" />
+                <span className="text-muted" style={{ fontSize: '0.9rem' }}>Analyzing repository storage...</span>
+              </div>
+            ) : treeError ? (
+              <div className="analytics-error-banner glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', textAlign: 'center' }}>
+                <AlertCircle size={32} style={{ color: 'var(--danger)' }} />
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', fontWeight: 600 }}>Failed to Load Storage Analytics</h3>
+                  <p className="text-muted" style={{ fontSize: '0.9rem', maxWidth: '400px' }}>{treeError}</p>
+                </div>
+                <button className="btn btn-outline" onClick={() => loadRepoTree()}>
+                  Retry Analysis
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Metrics Grid Cards */}
+                <div className="metrics-grid">
+                  {/* Metric Card 1: Storage Limit */}
+                  <div className="metric-card glass-panel">
+                    <div className="metric-card-header">
+                      <span className="metric-card-title">Storage Consumed</span>
+                      <HardDrive size={16} className="metric-card-icon text-primary" />
+                    </div>
+                    <div className="metric-value-container">
+                      <span className="metric-value">{formatBytes(totalSizeBytes)}</span>
+                      <span className="metric-limit">/ 1.0 GB</span>
+                    </div>
+                    <div className="metric-progress-wrapper">
+                      <div className="metric-progress-bar-container">
+                        <div className="metric-progress-bar-fill" style={{ width: `${storagePercentage}%` }} />
+                      </div>
+                      <span className="metric-progress-text">{storagePercentage}% Used</span>
+                    </div>
+                  </div>
+
+                  {/* Metric Card 2: Total Objects */}
+                  <div className="metric-card glass-panel">
+                    <div className="metric-card-header">
+                      <span className="metric-card-title">Total Objects</span>
+                      <Database size={16} className="metric-card-icon text-success" />
+                    </div>
+                    <div className="metric-value">{totalFiles + totalFolders}</div>
+                    <div className="metric-stats-details">
+                      <span>{totalFiles} files</span>
+                      <span className="bullet-separator">•</span>
+                      <span>{totalFolders} folders</span>
+                    </div>
+                  </div>
+
+                  {/* Metric Card 3: Average File Size */}
+                  <div className="metric-card glass-panel">
+                    <div className="metric-card-header">
+                      <span className="metric-card-title">Average File Size</span>
+                      <FileText size={16} className="metric-card-icon" style={{ color: '#f59e0b' }} />
+                    </div>
+                    <div className="metric-value">{formatBytes(averageFileSize)}</div>
+                    <span className="metric-subtitle">Across all recursive files</span>
+                  </div>
+
+                  {/* Metric Card 4: Access Mode */}
+                  <div className="metric-card glass-panel">
+                    <div className="metric-card-header">
+                      <span className="metric-card-title">Bucket Access Mode</span>
+                      {isPrivate ? (
+                        <Lock size={16} className="metric-card-icon text-danger" />
+                      ) : (
+                        <Unlock size={16} className="metric-card-icon text-success" />
+                      )}
+                    </div>
+                    <div className="metric-value" style={{ fontSize: '1.5rem', marginTop: '0.2rem' }}>
+                      {isPrivate ? 'Private Repository' : 'Public Access'}
+                    </div>
+                    <span className="metric-subtitle" style={{ color: isPrivate ? '#f87171' : '#4ade80' }}>
+                      {isPrivate ? 'CDN access might be restricted' : 'Global CDN distribution active'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* File-type distribution ratios */}
+                <div className="analytics-section glass-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">File-Type Distribution</h2>
+                    <span className="text-muted" style={{ fontSize: '0.85rem' }}>Ratio of total repository storage consumed</span>
+                  </div>
+
+                  {/* Segmented Bar Chart */}
+                  <div className="distribution-bar-container">
+                    <div className="distribution-bar">
+                      {distribution.map((segment, idx) => (
+                        segment.percentage > 0 && (
+                          <div
+                            key={idx}
+                            className="distribution-segment"
+                            style={{
+                              width: `${segment.percentage}%`,
+                              backgroundColor: segment.color
+                            }}
+                            title={`${segment.name}: ${formatBytes(segment.size)} (${segment.percentage}%)`}
+                          />
+                        )
+                      ))}
+                      {totalFiles === 0 && (
+                        <div className="distribution-segment empty" style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)' }} />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Distribution Legend Grid */}
+                  <div className="distribution-legend-grid">
+                    {distribution.map((segment, idx) => (
+                      <div key={idx} className="legend-item glass-card">
+                        <div className="legend-header">
+                          <span className="legend-color-dot" style={{ backgroundColor: segment.color }} />
+                          <span className="legend-name">{segment.name}</span>
+                        </div>
+                        <div className="legend-body">
+                          <span className="legend-size">{formatBytes(segment.size)}</span>
+                          <span className="legend-percentage">{segment.percentage}%</span>
+                        </div>
+                        <div className="legend-footer text-muted">
+                          {segment.count} file{segment.count !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Largest Files Table */}
+                <div className="analytics-section glass-panel" style={{ marginBottom: 0 }}>
+                  <div className="section-header">
+                    <h2 className="section-title">Largest Files (Bandwidth Hogs)</h2>
+                    <span className="text-muted" style={{ fontSize: '0.85rem' }}>Top 10 largest objects in repository</span>
+                  </div>
+
+                  <div className="largest-files-table-container">
+                    <table className="largest-files-table">
+                      <thead>
+                        <tr>
+                          <th>Path & Name</th>
+                          <th>Size</th>
+                          <th style={{ textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {largestFiles.map((file, idx) => {
+                          const ext = file.path.split('.').pop()?.toLowerCase() || '';
+                          const isHog = (file.size || 0) > 10 * 1024 * 1024; // > 10MB
+                          const getTreeFileIcon = () => {
+                            const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
+                            const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
+                            const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
+                            const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md', 'py', 'java', 'go', 'rs'];
+                            const sheetExts = ['xlsx', 'xls', 'csv'];
+                            const docxExts = ['docx'];
+
+                            if (imageExts.includes(ext)) return <ImageIcon size={16} style={{ color: '#38bdf8' }} />;
+                            if (videoExts.includes(ext)) return <Video size={16} style={{ color: '#ec4899' }} />;
+                            if (audioExts.includes(ext)) return <Music size={16} style={{ color: '#a855f7' }} />;
+                            if (ext === 'pdf') return <FileText size={16} style={{ color: '#f43f5e' }} />;
+                            if (sheetExts.includes(ext)) return <FileText size={16} style={{ color: '#10b981' }} />;
+                            if (docxExts.includes(ext)) return <FileText size={16} style={{ color: '#3b82f6' }} />;
+                            if (codeExts.includes(ext)) return <Code size={16} style={{ color: '#f59e0b' }} />;
+                            return <FileIcon size={16} />;
+                          };
+
+                          const handleLocateFile = (fileItem: GithubTreeItem) => {
+                            const parts = fileItem.path.split('/');
+                            parts.pop(); // Remove file name
+                            const folderPath = parts.join('/');
+                            setCurrentPath(folderPath);
+                            setSelectedFileSha(fileItem.sha);
+                            setActiveTab('explorer');
+                            loadContents(folderPath);
+                          };
+
+                          const handleCopyTreeCdn = () => {
+                            const url = getCdnUrl(session.owner, activeRepo.repo, activeRepo.branch, file.path);
+                            navigator.clipboard.writeText(url);
+                            setCopiedFileUrl(url);
+                            setTimeout(() => setCopiedFileUrl(null), 2000);
+                          };
+
+                          const handleTreeDelete = async () => {
+                            if (confirm(`Are you sure you want to delete "${file.path}"?`)) {
+                              setLoadingTree(true);
+                              try {
+                                const creds = {
+                                  token: session.token,
+                                  owner: session.owner,
+                                  repo: activeRepo.repo,
+                                  branch: activeRepo.branch
+                                };
+                                await deleteFile(creds, file.path, file.sha);
+                                await loadContents();
+                                await loadRepoTree();
+                              } catch (err: any) {
+                                console.error(err);
+                                alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
+                                setLoadingTree(false);
+                              }
+                            }
+                          };
+
+                          return (
+                            <tr key={idx} className={isHog ? 'hog-row' : ''}>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  {getTreeFileIcon()}
+                                  <span className="file-path-text" title={file.path}>{file.path}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <span className={`file-size-text ${isHog ? 'text-warning font-semibold' : ''}`}>
+                                  {formatBytes(file.size || 0)}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                  <button
+                                    className="btn-icon"
+                                    onClick={handleCopyTreeCdn}
+                                    title="Copy CDN Link"
+                                  >
+                                    <Copy size={13} />
+                                  </button>
+                                  <button
+                                    className="btn-icon"
+                                    onClick={() => handleLocateFile(file)}
+                                    title="Locate in Explorer"
+                                  >
+                                    <ExternalLink size={13} />
+                                  </button>
+                                  <button
+                                    className="btn-icon"
+                                    style={{ color: 'var(--danger)' }}
+                                    onClick={handleTreeDelete}
+                                    title="Delete File"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {largestFiles.length === 0 && (
+                          <tr>
+                            <td colSpan={3} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                              No files found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
+        )}
+      </div>
         ) : (
           /* Welcome & Attach Repositories Dashboard Screen */
           <div className="dashboard-welcome-container">

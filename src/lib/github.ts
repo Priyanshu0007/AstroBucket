@@ -230,9 +230,17 @@ export const fetchUserProfile = async (token: string, owner: string): Promise<Gi
   };
 };
 
+export interface GithubTreeItem {
+  path: string;
+  sha: string;
+  type: 'blob' | 'tree';
+  size?: number;
+  url?: string;
+}
+
 export const fetchRepoTree = async (
   creds: GithubCredentials
-): Promise<{ path: string; sha: string; type: string }[]> => {
+): Promise<GithubTreeItem[]> => {
   const { owner, repo, branch, token } = creds;
   const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
   const response = await fetch(url, { headers: getHeaders(token) });
