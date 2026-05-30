@@ -20,6 +20,9 @@ import { GithubIcon as Github } from './GithubIcon';
 import { WebGPURedraw } from './WebGPURedraw';
 import { AstroBucketLogo } from './AstroBucketLogo';
 
+// Import CSS
+import '../styles/landing.css';
+
 /**
  * LandingPageProps
  * 
