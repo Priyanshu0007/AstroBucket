@@ -99,8 +99,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       a: "AstroBucket is an open-source, serverless S3-style console that allows you to manage assets inside your GitHub repositories and generate edge-cached jsDelivr CDN links. It acts as a free, lightweight content delivery network backend."
     },
     {
-      q: "Is my GitHub Personal Access Token secure?",
-      a: "Absolutely. AstroBucket is a 100% client-side application. Your credentials, repos, and tokens are stored solely in your browser's local storage and used directly to communicate with GitHub's secure API. No data is transmitted to middleman servers."
+      q: "Is my GitHub OAuth connection secure?",
+      a: "Absolutely. AstroBucket acts 100% client-side. Token requests are processed through a serverless exchange proxy, and the resulting OAuth tokens are stored directly in your browser's local storage. No user data or credentials ever touch third-party middleman databases."
     },
     {
       q: "Are there any storage limits or bandwidth costs?",
@@ -327,7 +327,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* How It Works Steps Section */}
       <section id="steps" className="how-it-works">
         <div className="section-header">
-          <h2>Three Steps to Deploy</h2>
+          <h2>Four Steps to Deploy</h2>
           <p className="text-muted" style={{ maxWidth: '600px', margin: '0 auto' }}>
             Connecting your repository is extremely simple and requires no specialized server setup.
           </p>
@@ -336,20 +336,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="steps-container">
           <div className="step-card">
             <div className="step-number">1</div>
-            <h3>Generate GitHub PAT</h3>
-            <p>Create a classic personal access token on your GitHub account with read/write access to repository contents.</p>
+            <h3>One-Click GitHub OAuth</h3>
+            <p>Securely connect AstroBucket to your GitHub account with a single click using standard GitHub OAuth 2.0 authorization.</p>
           </div>
 
           <div className="step-card">
             <div className="step-number">2</div>
-            <h3>Provide Repository Path</h3>
-            <p>Connect using your GitHub user profile, targeted repository name, and repository branch in the connection form.</p>
+            <h3>Attach Repositories</h3>
+            <p>Select from your list of available repositories or manually specify your desired storage branch to spin up a bucket.</p>
           </div>
 
           <div className="step-card">
             <div className="step-number">3</div>
             <h3>Upload & Distribute</h3>
-            <p>Drag and drop images, stylesheets, or scripts to start copying globally distributed edge-cached CDN urls.</p>
+            <p>Drag and drop images, stylesheets, or scripts to start copying globally distributed edge-cached CDN urls instantly.</p>
+          </div>
+
+          <div className="step-card">
+            <div className="step-number">4</div>
+            <h3>Edit & Analyze Assets</h3>
+            <p>Crop, rotate, and compress images directly inside the built-in canvas editor, or review detailed storage space analytics charts.</p>
           </div>
         </div>
       </section>
