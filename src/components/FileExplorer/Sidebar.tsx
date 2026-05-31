@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GithubProfile } from '../../lib/github';
+import type { GithubProfile } from '../../api/types';
 import type { GithubSession } from '../../App';
 import type { AttachedRepo } from './types';
 import { Plus, BookOpen, X, LogOut, User } from 'lucide-react';

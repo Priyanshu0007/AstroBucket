@@ -10,18 +10,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.100.14",
+    "axios": "1.16.1",
     "clsx": "2.1.1",
-    "docx-preview": "^0.3.7",
+    "docx-preview": "0.3.7",
     "lucide-react": "1.16.0",
-    "marked": "^18.0.4",
+    "marked": "18.0.4",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tailwind-merge": "3.6.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/marked": "^5.0.2",
+    "@types/marked": "5.0.2",
     "@types/node": "24.12.3",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

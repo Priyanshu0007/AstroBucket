@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GithubFile } from '../../lib/github';
-import { getCdnUrl, fetchFileRaw } from '../../lib/github';
+import type { GithubFile } from '../../api/types';
+import { getCdnUrl, fetchFileRaw } from '../../api/client';
 import { 
   Folder, 
   File as FileIcon, 

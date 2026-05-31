@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { GithubFile } from '../../lib/github';
+import type { GithubFile } from '../../api/types';
 import type { GithubSession } from '../../App';
 import type { AttachedRepo } from './types';
 import { MediaThumbnail } from './MediaThumbnail';

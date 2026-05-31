@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import type { GithubFile, GithubRepo, GithubProfile, GithubTreeItem } from '../lib/github';
+import type { GithubFile } from '../api/types';
 import { 
-  fetchContents, 
   uploadFile, 
-  deleteFile, 
   getCdnUrl,
   fileToBase64,
-  fetchUserRepos,
-  fetchUserProfile,
   fetchRepoTree
-} from '../lib/github';
+} from '../api/client';
+import {
+  useUserProfile,
+  useUserRepos,
+  useRepoContents,
+  useRepoTree,
+  useUploadFile,
+  useDeleteFile
+} from '../api/hooks';
 import { Check, RefreshCw } from 'lucide-react';
 import { FilePreviewModal } from './FilePreviewModal';
 import type { GithubSession } from '../App';
@@ -36,13 +40,11 @@ interface FileExplorerProps {
 export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout }) => {
   const [attachedRepos, setAttachedRepos] = useState<AttachedRepo[]>([]);
   const [activeRepo, setActiveRepo] = useState<AttachedRepo | null>(null);
-  const [profile, setProfile] = useState<GithubProfile | null>(null);
 
   // File explorer states
   const [currentPath, setCurrentPath] = useState<string>('');
-  const [files, setFiles] = useState<GithubFile[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
   const [uploading, setUploading] = useState(false);
+  const [localActionLoading, setLocalActionLoading] = useState<boolean>(false);
 
   // Batch upload states
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
@@ -54,18 +56,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   const [selectedFileSha, setSelectedFileSha] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<GithubFile | null>(null);
 
-  // Fetching GitHub repositories
-  const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
-  const [fetchingRepos, setFetchingRepos] = useState(false);
-
   // Copy success notification state
   const [copiedFileUrl, setCopiedFileUrl] = useState<string | null>(null);
 
   // Analytics Dashboard states
   const [activeTab, setActiveTab] = useState<'explorer' | 'analytics'>('explorer');
-  const [repoTree, setRepoTree] = useState<GithubTreeItem[]>([]);
-  const [loadingTree, setLoadingTree] = useState<boolean>(false);
-  const [treeError, setTreeError] = useState<string | null>(null);
 
   // Elapsed time tracker for speed calculations
   useEffect(() => {
@@ -101,97 +96,63 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         console.error('Failed to parse active repo', e);
       }
     }
-    
-    loadUserProfile();
-    loadGithubRepos();
   }, [session]);
 
-  const loadUserProfile = async () => {
-    try {
-      const data = await fetchUserProfile(session.token, session.owner);
-      setProfile(data);
-    } catch (err) {
-      console.error('Failed to fetch user profile', err);
-    }
-  };
+  // TanStack Query Hooks
+  const { data: profile } = useUserProfile(session.token, session.owner);
+  const { 
+    data: githubRepos = [], 
+    isFetching: fetchingRepos, 
+    refetch: refetchGithubRepos 
+  } = useUserRepos(session.token, session.owner);
 
-  const loadGithubRepos = async () => {
-    setFetchingRepos(true);
-    try {
-      const data = await fetchUserRepos(session.token, session.owner);
-      setGithubRepos(data);
-    } catch (err) {
-      console.error('Failed to fetch user repos', err);
-    } finally {
-      setFetchingRepos(false);
-    }
-  };
+  const { 
+    data: rawFiles = [], 
+    isFetching: loadingContents, 
+    refetch: refetchContents 
+  } = useRepoContents(
+    session.token,
+    session.owner,
+    activeRepo?.repo,
+    activeRepo?.branch,
+    currentPath
+  );
 
-  const loadRepoTree = async (targetRepo: AttachedRepo | null = activeRepo) => {
-    if (!targetRepo) return;
-    setLoadingTree(true);
-    setTreeError(null);
-    try {
-      const creds = {
-        token: session.token,
-        owner: session.owner,
-        repo: targetRepo.repo,
-        branch: targetRepo.branch
-      };
-      const tree = await fetchRepoTree(creds);
-      setRepoTree(tree);
-    } catch (err: any) {
-      console.error('Failed to load repository tree:', err);
-      setTreeError(err.message || 'Failed to scan repository files recursively.');
-    } finally {
-      setLoadingTree(false);
-    }
-  };
+  const { 
+    data: repoTree = [], 
+    isFetching: loadingTree, 
+    error: treeErrorObj, 
+    refetch: refetchRepoTree 
+  } = useRepoTree(
+    session.token,
+    session.owner,
+    activeRepo?.repo,
+    activeRepo?.branch
+  );
 
-  // Whenever activeRepo changes, load files
+  const treeError = treeErrorObj ? (treeErrorObj as Error).message || 'Failed to scan repository files recursively.' : null;
+
+  // Mutation hooks
+  const uploadMutation = useUploadFile();
+  const deleteMutation = useDeleteFile();
+
+  const loading = loadingContents || localActionLoading;
+
+  const files = React.useMemo(() => {
+    return [...rawFiles].sort((a, b) => {
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === 'dir' ? -1 : 1;
+    });
+  }, [rawFiles]);
+
+  // Whenever activeRepo changes, reset path/tab
   useEffect(() => {
-    if (activeRepo) {
-      loadContents('');
-      loadRepoTree(activeRepo);
-    } else {
-      setFiles([]);
+    if (!activeRepo) {
       setCurrentPath('');
-      setRepoTree([]);
     }
     setSelectedFileSha(null);
     setActiveTab('explorer');
-    setTreeError(null);
   }, [activeRepo]);
-
-  const loadContents = async (path: string = currentPath) => {
-    if (!activeRepo) return;
-    setLoading(true);
-    try {
-      const creds = {
-        token: session.token,
-        owner: session.owner,
-        repo: activeRepo.repo,
-        branch: activeRepo.branch
-      };
-      const data = await fetchContents(creds, path);
-      data.sort((a, b) => {
-        if (a.type === b.type) return a.name.localeCompare(b.name);
-        return a.type === 'dir' ? -1 : 1;
-      });
-      setFiles(data);
-      setCurrentPath(path);
-    } catch (err: any) {
-      console.error(err);
-      if (err?.message?.includes('Resource not accessible')) {
-        alert('GitHub Token Error: Your Personal Access Token does not have read access. Please ensure your token has "Contents: Read and write" repository permissions.');
-      } else {
-        alert('Failed to load repository contents. Please check your credentials and repository details.');
-      }
-    } finally {
-      setLoading(false);
-      setSelectedFileSha(null);
-    }
-  };
 
   const selectRepo = (repo: AttachedRepo | null) => {
     setActiveRepo(repo);
@@ -239,7 +200,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
 
   const handleCreateFolder = async (folderName: string) => {
     if (!activeRepo) return;
-    setLoading(true);
+    setLocalActionLoading(true);
     try {
       const creds = {
         token: session.token,
@@ -252,25 +213,28 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         ? `${currentPath}/${folderName}/.gitkeep` 
         : `${folderName}/.gitkeep`;
         
-      await uploadFile(creds, folderPath, "", `Create folder ${folderName}`);
-      await loadContents();
-      loadRepoTree();
+      await uploadMutation.mutateAsync({
+        creds,
+        path: folderPath,
+        contentBase64: '',
+        message: `Create folder ${folderName}`
+      });
     } catch (err: any) {
       console.error(err);
       alert(`Failed to create folder: ${err.message || 'Unknown error'}`);
     } finally {
-      setLoading(false);
+      setLocalActionLoading(false);
     }
   };
 
   const handleNavigate = (path: string) => {
-    loadContents(path);
+    setCurrentPath(path);
   };
 
   const handleBreadcrumbClick = (index: number) => {
     const parts = currentPath.split('/').filter(Boolean);
     const newPath = parts.slice(0, index + 1).join('/');
-    loadContents(newPath);
+    setCurrentPath(newPath);
   };
 
   const handleCopyCdn = (file: GithubFile) => {
@@ -284,7 +248,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
   const handleDelete = async (file: GithubFile) => {
     if (!activeRepo) return;
     if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
-      setLoading(true);
+      setLocalActionLoading(true);
       try {
         const creds = {
           token: session.token,
@@ -292,25 +256,28 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
           repo: activeRepo.repo,
           branch: activeRepo.branch
         };
-        await deleteFile(creds, file.path, file.sha);
-        await loadContents();
-        loadRepoTree();
+        await deleteMutation.mutateAsync({
+          creds,
+          path: file.path,
+          sha: file.sha,
+          message: `Delete via AstroBucket`
+        });
       } catch (err: any) {
         console.error(err);
-        if (err?.message?.includes('Resource not accessible')) {
+        if (err?.response?.data?.message?.includes('Resource not accessible')) {
           alert('GitHub Token Error: Your Personal Access Token does not have write access. Please ensure your token has "Contents: Read and write" repository permissions.');
         } else {
           alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
         }
-        setLoading(false);
+      } finally {
+        setLocalActionLoading(false);
       }
     }
   };
 
-  // Helper delete file specifically for Analytics View
   const handleAnalyticsDeleteFile = async (path: string, sha: string) => {
     if (!activeRepo) return;
-    setLoadingTree(true);
+    setLocalActionLoading(true);
     try {
       const creds = {
         token: session.token,
@@ -318,13 +285,17 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         repo: activeRepo.repo,
         branch: activeRepo.branch
       };
-      await deleteFile(creds, path, sha);
-      await loadContents();
-      await loadRepoTree();
+      await deleteMutation.mutateAsync({
+        creds,
+        path,
+        sha,
+        message: `Delete via AstroBucket`
+      });
     } catch (err: any) {
       console.error(err);
       alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
-      setLoadingTree(false);
+    } finally {
+      setLocalActionLoading(false);
     }
   };
 
@@ -335,7 +306,6 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     setCurrentPath(folderPath);
     setSelectedFileSha(sha);
     setActiveTab('explorer');
-    loadContents(folderPath);
   };
 
   const startBatchUpload = async (filesToUpload: { file: File; relativePath: string }[]) => {
@@ -441,8 +411,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     await Promise.all(workers);
     
     setUploading(false);
-    await loadContents();
-    loadRepoTree();
+    refetchContents();
+    refetchRepoTree();
   };
 
   const activeRepoDetails = githubRepos.find(r => r.name.toLowerCase() === activeRepo?.repo.toLowerCase());
@@ -453,7 +423,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       {/* Side Navigation Panel */}
       <Sidebar 
         session={session}
-        profile={profile}
+        profile={profile || null}
         attachedRepos={attachedRepos}
         activeRepo={activeRepo}
         selectRepo={selectRepo}
@@ -469,7 +439,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
             <header className="workspace-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <button className="btn-icon btn-back-dashboard" onClick={() => selectRepo(null)} title="Back to Dashboard">
-                  <RefreshCw size={18} style={{ transform: 'rotate(-90deg)' }} /> {/* Using a custom back icon indicator */}
+                  <RefreshCw size={18} style={{ transform: 'rotate(-90deg)' }} />
                 </button>
                 <div>
                   <h1 style={{ fontSize: '1.5rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -483,7 +453,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button className="btn btn-outline" onClick={() => { loadContents(); loadRepoTree(); }} disabled={loading || uploading}>
+                <button className="btn btn-outline" onClick={() => { refetchContents(); refetchRepoTree(); }} disabled={loading || uploading}>
                   <RefreshCw size={16} className={loading ? 'spin' : ''} /> Refresh
                 </button>
                 <a 
@@ -538,7 +508,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                 repoTree={repoTree}
                 loadingTree={loadingTree}
                 treeError={treeError}
-                loadRepoTree={loadRepoTree}
+                loadRepoTree={() => refetchRepoTree()}
                 isPrivate={isPrivate}
                 onLocateFile={handleLocateFile}
                 onCopyTreeCdn={(url) => {
@@ -557,7 +527,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
             attachedRepos={attachedRepos}
             githubRepos={githubRepos}
             fetchingRepos={fetchingRepos}
-            loadGithubRepos={loadGithubRepos}
+            loadGithubRepos={refetchGithubRepos}
             attachRepo={attachRepo}
             detachRepo={detachRepo}
             selectRepo={selectRepo}
@@ -576,8 +546,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
           session={session}
           activeRepo={activeRepo}
           onFileModified={() => {
-            loadContents();
-            loadRepoTree();
+            refetchContents();
+            refetchRepoTree();
           }}
         />
       )}

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import type { GithubSession } from '../../App';
-import type { GithubRepo } from '../../lib/github';
+import type { GithubRepo } from '../../api/types';
 import type { AttachedRepo } from './types';
 import { AlertCircle, BookOpen, Trash2, RefreshCw, Search, Plus } from 'lucide-react';
+import { apiClient } from '../../api/client';
 
 interface WelcomeDashboardProps {
   session: GithubSession;
@@ -43,21 +44,11 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
 
     setAttachingManual(true);
     try {
-      const headers = {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${session.token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-      };
-      const response = await fetch(
-        `https://api.github.com/repos/${session.owner}/${manualRepo.trim()}`,
-        { headers }
+      const response = await apiClient.get(
+        `/repos/${session.owner}/${manualRepo.trim()}`
       );
       
-      if (!response.ok) {
-        throw new Error(`Repository "${manualRepo.trim()}" not found or inaccessible under owner "${session.owner}".`);
-      }
-      
-      const repoDetails = await response.json();
+      const repoDetails = response.data;
       const defaultBranch = manualBranch.trim() || repoDetails.default_branch || 'main';
       
       attachRepo(manualRepo.trim(), defaultBranch);
@@ -65,7 +56,10 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
       setManualBranch('main');
     } catch (err: any) {
       console.error(err);
-      setManualError(err.message || 'Verification failed. Check the repository name.');
+      const errMsg = err?.response?.status === 404
+        ? `Repository "${manualRepo.trim()}" not found or inaccessible under owner "${session.owner}".`
+        : (err.message || 'Verification failed. Check the repository name.');
+      setManualError(errMsg);
     } finally {
       setAttachingManual(false);
     }

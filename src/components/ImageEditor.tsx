@@ -12,10 +12,10 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
-import type { GithubFile } from '../lib/github';
+import type { GithubFile } from '../api/types';
 import type { GithubSession } from '../App';
 import type { AttachedRepo } from './FileExplorer/types';
-import { uploadFile, deleteFile } from '../lib/github';
+import { uploadFile, deleteFile, apiClient } from '../api/client';
 
 // Import CSS
 import '../styles/editor.css';
@@ -530,19 +530,13 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
                 const cleanTargetPath = targetPath.trim().replace(/^\//, '');
                 
                 try {
-                  const metaUrl = `https://api.github.com/repos/${creds.owner}/${creds.repo}/contents/${cleanTargetPath}?ref=${creds.branch}`;
-                  const metaRes = await fetch(metaUrl, {
+                  const metaRes = await apiClient.get(`/repos/${creds.owner}/${creds.repo}/contents/${cleanTargetPath}`, {
+                    params: { ref: creds.branch },
                     headers: {
-                      Accept: 'application/vnd.github+json',
-                      Authorization: `Bearer ${creds.token}`,
-                      'X-GitHub-Api-Version': '2022-11-28',
-                    },
-                    cache: 'no-store',
+                      Authorization: `Bearer ${creds.token}`
+                    }
                   });
-                  if (metaRes.ok) {
-                    const metaData = await metaRes.json();
-                    existingSha = metaData.sha;
-                  }
+                  existingSha = metaRes.data.sha;
                 } catch {
                   const matchedFile = files.find(f => f.path === cleanTargetPath);
                   if (matchedFile) {

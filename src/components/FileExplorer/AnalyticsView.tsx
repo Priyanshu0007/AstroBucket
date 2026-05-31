@@ -1,8 +1,8 @@
 import React from 'react';
 import type { GithubSession } from '../../App';
-import type { GithubTreeItem } from '../../lib/github';
+import type { GithubTreeItem } from '../../api/types';
 import type { AttachedRepo } from './types';
-import { getCdnUrl } from '../../lib/github';
+import { getCdnUrl } from '../../api/client';
 import { 
   AlertCircle, 
   RefreshCw, 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Key, Save, X, User, AlertTriangle } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
+import { fetchUserProfile } from '../api/client';
 
 /**
  * SettingsModalProps
@@ -39,24 +40,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setError('');
       try {
         // Basic validation: attempt to verify the credentials by fetching user info
-        const headers = {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token.trim()}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        };
-        const response = await fetch(`https://api.github.com/users/${owner.trim()}`, { headers });
-        if (!response.ok) {
-          throw new Error(
-            response.status === 401 
-              ? 'Invalid Personal Access Token.' 
-              : `Owner "${owner}" not found or API rate limit exceeded.`
-          );
-        }
-        
+        await fetchUserProfile(token.trim(), owner.trim());
         onSave(token.trim(), owner.trim());
       } catch (err: any) {
         console.error(err);
-        setError(err.message || 'Verification failed. Please check token and owner username.');
+        const errMsg = err?.response?.status === 401 
+          ? 'Invalid Personal Access Token.' 
+          : err?.response?.status === 404 
+            ? `Owner "${owner}" not found.`
+            : 'Verification failed. Please check token and owner username.';
+        setError(errMsg);
       } finally {
         setConnecting(false);
       }

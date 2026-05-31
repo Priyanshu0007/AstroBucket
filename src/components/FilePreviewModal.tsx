@@ -15,10 +15,10 @@ import {
   Check,
   Sliders
 } from 'lucide-react';
-import type { GithubFile } from '../lib/github';
+import type { GithubFile } from '../api/types';
 import type { GithubSession } from '../App';
 import type { AttachedRepo } from './FileExplorer/types';
-import { fetchFileRaw, getCdnUrl } from '../lib/github';
+import { fetchFileRaw, getCdnUrl } from '../api/client';
 import { marked } from 'marked';
 import * as XLSX from 'xlsx';
 import { renderAsync } from 'docx-preview';
