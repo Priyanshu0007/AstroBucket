@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { SettingsModal } from './components/SettingsModal';
 import { FileExplorer } from './components/FileExplorer';
-import { PinModal } from './components/PinModal';
-import { encryptToken, decryptToken } from './lib/crypto';
-import { setDecryptedToken } from './api/client';
 import { RefreshCw } from 'lucide-react';
 import axios from 'axios';
 
@@ -16,14 +13,12 @@ export interface GithubSession {
 /**
  * App.tsx
  * 
- * Main application container managing session state, views, OAuth redirects, and PIN security.
+ * Main application container managing session state, views, and OAuth redirects.
  */
 function App() {
   const [session, setSession] = useState<GithubSession | null>(null);
-  const [pendingSession, setPendingSession] = useState<GithubSession | null>(null);
   const [view, setView] = useState<'landing' | 'explorer'>('landing');
   const [isConnectOpen, setIsConnectOpen] = useState<boolean>(false);
-  const [showPinModal, setShowPinModal] = useState<'create' | 'unlock' | null>(null);
   const [loadingSession, setLoadingSession] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -44,8 +39,10 @@ function App() {
           const { access_token, user } = response.data;
           
           if (access_token && user?.login) {
-            setPendingSession({ token: access_token, owner: user.login });
-            setShowPinModal('create');
+            const newSession = { token: access_token, owner: user.login };
+            localStorage.setItem('astrobucket-session', JSON.stringify(newSession));
+            setSession(newSession);
+            setView('explorer');
           } else {
             throw new Error('Invalid token details returned.');
           }
@@ -70,26 +67,20 @@ function App() {
     if (savedSession) {
       try {
         const parsed = JSON.parse(savedSession);
-        if (parsed.token) {
-          // If token contains 'ciphertext', it is properly encrypted
-          if (parsed.token.includes('ciphertext')) {
-            setPendingSession(parsed);
-            setShowPinModal('unlock');
-          } else {
-            // Auto-upgrade unencrypted legacy sessions to secure format
-            setPendingSession(parsed);
-            setShowPinModal('create');
-          }
+        if (parsed.token && parsed.owner) {
+          setSession(parsed);
+          setView('explorer'); // Auto-login returning users to console
         }
       } catch (e) {
         console.error('Failed to parse saved session', e);
       }
     } else if (savedCreds) {
-      // Migrate legacy credentials and secure them
+      // Migrate legacy credentials
       try {
         const parsed = JSON.parse(savedCreds);
         if (parsed.token && parsed.owner) {
           const newSession: GithubSession = { token: parsed.token, owner: parsed.owner };
+          localStorage.setItem('astrobucket-session', JSON.stringify(newSession));
           
           // Save the repository as the first attached repo for user
           if (parsed.repo) {
@@ -99,9 +90,9 @@ function App() {
           }
           
           localStorage.removeItem('astrobucket-creds');
-          setPendingSession(newSession);
-          setShowPinModal('create'); // Ask to secure it with a PIN
-          console.log('Migrated legacy credentials. Requesting encryption setup.');
+          setSession(newSession);
+          setView('explorer');
+          console.log('Migrated legacy credentials to new format.');
         }
       } catch (e) {
         console.error('Failed to migrate credentials', e);
@@ -109,62 +100,18 @@ function App() {
     }
   }, []);
 
-  // Triggered when PIN modal operations succeed (create or unlock)
-  const handlePinComplete = async (pin: string) => {
-    if (!pendingSession) return;
-
-    if (showPinModal === 'create') {
-      // Encrypt the plain-text token
-      const encryptedToken = await encryptToken(pendingSession.token, pin);
-      const secureSession = { token: encryptedToken, owner: pendingSession.owner };
-      
-      // Store ciphertext session in localStorage
-      localStorage.setItem('astrobucket-session', JSON.stringify(secureSession));
-      
-      // Keep plain-text session in React state and Client header in-memory
-      setDecryptedToken(pendingSession.token);
-      setSession({ token: pendingSession.token, owner: pendingSession.owner });
-      
-      setPendingSession(null);
-      setShowPinModal(null);
-      setView('explorer');
-    } else if (showPinModal === 'unlock') {
-      // Decrypt the ciphertext token from storage
-      const decryptedTokenVal = await decryptToken(pendingSession.token, pin);
-      
-      // Keep plain-text session in React state and Client header in-memory
-      setDecryptedToken(decryptedTokenVal);
-      setSession({ token: decryptedTokenVal, owner: pendingSession.owner });
-      
-      setPendingSession(null);
-      setShowPinModal(null);
-      setView('explorer');
-    }
-  };
-
   const handleSaveSession = (token: string, owner: string) => {
-    // Initiate PIN setup to encrypt the manual fallback credentials before saving
-    setPendingSession({ token, owner });
+    const newSession = { token, owner };
+    localStorage.setItem('astrobucket-session', JSON.stringify(newSession));
+    setSession(newSession);
     setIsConnectOpen(false);
-    setShowPinModal('create');
+    setView('explorer'); // Transition to dashboard
   };
 
   const handleLogout = () => {
     localStorage.removeItem('astrobucket-session');
-    setDecryptedToken(null);
     setSession(null);
-    setPendingSession(null);
     setView('landing'); // Return to landing page
-  };
-
-  const handleResetSession = () => {
-    // Wipe local storage and state when user requests a hard reset (forgot PIN)
-    localStorage.removeItem('astrobucket-session');
-    setDecryptedToken(null);
-    setSession(null);
-    setPendingSession(null);
-    setShowPinModal(null);
-    setView('landing');
   };
 
   return (
@@ -220,15 +167,6 @@ function App() {
           onSave={handleSaveSession} 
           isClosable={true} 
           onClose={() => setIsConnectOpen(false)}
-        />
-      )}
-
-      {/* Security PIN creation/entry dialog */}
-      {showPinModal && (
-        <PinModal
-          mode={showPinModal}
-          onComplete={handlePinComplete}
-          onResetSession={handleResetSession}
         />
       )}
     </>
