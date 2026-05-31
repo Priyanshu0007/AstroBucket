@@ -2,7 +2,6 @@ import React from 'react';
 import type { GithubSession } from '../../App';
 import type { GithubTreeItem } from '../../api/types';
 import type { AttachedRepo } from './types';
-import { getCdnUrl } from '../../api/client';
 import { 
   AlertCircle, 
   RefreshCw, 
@@ -10,16 +9,11 @@ import {
   Database, 
   FileText, 
   Lock, 
-  Unlock, 
-  Image as ImageIcon, 
-  Video, 
-  Music, 
-  Code, 
-  File as FileIcon, 
-  ExternalLink, 
-  Trash2, 
-  Copy 
+  Unlock 
 } from 'lucide-react';
+import { DonutChart } from './DonutChart';
+import { AreaChart } from './AreaChart';
+import { LargestFilesTable } from './LargestFilesTable';
 
 interface AnalyticsViewProps {
   session: GithubSession;
@@ -68,12 +62,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   const storagePercentage = Math.min(100, parseFloat(((totalSizeBytes / storageLimitBytes) * 100).toFixed(2)));
 
   const categories = [
-    { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff'], color: '#38bdf8', bgClass: 'bg-images' },
-    { name: 'Videos & Audio', extensions: ['mp4', 'webm', 'mov', 'avi', 'mkv', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], color: '#ec4899', bgClass: 'bg-media' },
-    { name: 'Code & Scripts', extensions: ['html', 'js', 'ts', 'jsx', 'tsx', 'json', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'sh', 'php', 'rb', 'sql'], color: '#f59e0b', bgClass: 'bg-code' },
-    { name: 'Stylesheets', extensions: ['css', 'scss', 'sass', 'less'], color: '#10b981', bgClass: 'bg-styles' },
-    { name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'txt', 'md', 'pptx', 'ppt', 'zip', 'tar', 'gz'], color: '#3b82f6', bgClass: 'bg-docs' },
-    { name: 'Others', extensions: [], color: '#6b7280', bgClass: 'bg-others' }
+    { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff'], color: '#00f0ff', bgClass: 'bg-images' },
+    { name: 'Videos & Audio', extensions: ['mp4', 'webm', 'mov', 'avi', 'mkv', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'], color: '#a855f7', bgClass: 'bg-media' },
+    { name: 'Code & Scripts', extensions: ['html', 'js', 'ts', 'jsx', 'tsx', 'json', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'sh', 'php', 'rb', 'sql'], color: '#ff8c00', bgClass: 'bg-code' },
+    { name: 'Stylesheets', extensions: ['css', 'scss', 'sass', 'less'], color: '#ff007f', bgClass: 'bg-styles' },
+    { name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'txt', 'md', 'pptx', 'ppt', 'zip', 'tar', 'gz'], color: '#39ff14', bgClass: 'bg-docs' },
+    { name: 'Others', extensions: [], color: '#94a3b8', bgClass: 'bg-others' }
   ];
 
   const distribution = categories.map(cat => ({
@@ -200,151 +194,32 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
       </div>
 
-      {/* File-type distribution ratios */}
-      <div className="analytics-section glass-panel">
-        <div className="section-header">
-          <h2 className="section-title">File-Type Distribution</h2>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>Ratio of total repository storage consumed</span>
-        </div>
-
-        {/* Segmented Bar Chart */}
-        <div className="distribution-bar-container">
-          <div className="distribution-bar">
-            {distribution.map((segment, idx) => (
-              segment.percentage > 0 && (
-                <div
-                  key={idx}
-                  className="distribution-segment"
-                  style={{
-                    width: `${segment.percentage}%`,
-                    backgroundColor: segment.color
-                  }}
-                  title={`${segment.name}: ${formatBytes(segment.size)} (${segment.percentage}%)`}
-                />
-              )
-            ))}
-            {totalFiles === 0 && (
-              <div className="distribution-segment empty" style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-            )}
-          </div>
-        </div>
-
-        {/* Distribution Legend Grid */}
-        <div className="distribution-legend-grid">
-          {distribution.map((segment, idx) => (
-            <div key={idx} className="legend-item glass-card">
-              <div className="legend-header">
-                <span className="legend-color-dot" style={{ backgroundColor: segment.color }} />
-                <span className="legend-name">{segment.name}</span>
-              </div>
-              <div className="legend-body">
-                <span className="legend-size">{formatBytes(segment.size)}</span>
-                <span className="legend-percentage">{segment.percentage}%</span>
-              </div>
-              <div className="legend-footer text-muted">
-                {segment.count} file{segment.count !== 1 ? 's' : ''}
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Interactive SVG Charts Section (Donut & Area Charts) */}
+      <div className="charts-grid">
+        <DonutChart 
+          distribution={distribution}
+          totalSizeBytes={totalSizeBytes}
+          totalFiles={totalFiles}
+          formatBytes={formatBytes}
+        />
+        <AreaChart 
+          repoName={activeRepo.repo}
+          totalSizeBytes={totalSizeBytes}
+          totalFiles={totalFiles}
+          formatBytes={formatBytes}
+        />
       </div>
 
       {/* Largest Files Table */}
-      <div className="analytics-section glass-panel" style={{ marginBottom: 0 }}>
-        <div className="section-header">
-          <h2 className="section-title">Largest Files (Bandwidth Hogs)</h2>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>Top 10 largest objects in repository</span>
-        </div>
-
-        <div className="largest-files-table-container">
-          <table className="largest-files-table">
-            <thead>
-              <tr>
-                <th>Path & Name</th>
-                <th>Size</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {largestFiles.map((file, idx) => {
-                const ext = file.path.split('.').pop()?.toLowerCase() || '';
-                const isHog = (file.size || 0) > 10 * 1024 * 1024; // > 10MB
-                const getTreeFileIcon = () => {
-                  const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
-                  const videoExts = ['mp4', 'webm', 'ogg', 'mov'];
-                  const audioExts = ['mp3', 'wav', 'ogg', 'm4a'];
-                  const codeExts = ['html', 'css', 'js', 'ts', 'jsx', 'tsx', 'json', 'md', 'py', 'java', 'go', 'rs'];
-                  const sheetExts = ['xlsx', 'xls', 'csv'];
-                  const docxExts = ['docx'];
-
-                  if (imageExts.includes(ext)) return <ImageIcon size={16} style={{ color: '#38bdf8' }} />;
-                  if (videoExts.includes(ext)) return <Video size={16} style={{ color: '#ec4899' }} />;
-                  if (audioExts.includes(ext)) return <Music size={16} style={{ color: '#a855f7' }} />;
-                  if (ext === 'pdf') return <FileText size={16} style={{ color: '#f43f5e' }} />;
-                  if (sheetExts.includes(ext)) return <FileText size={16} style={{ color: '#10b981' }} />;
-                  if (docxExts.includes(ext)) return <FileText size={16} style={{ color: '#3b82f6' }} />;
-                  if (codeExts.includes(ext)) return <Code size={16} style={{ color: '#f59e0b' }} />;
-                  return <FileIcon size={16} />;
-                };
-
-                const handleCopyTreeCdnClick = () => {
-                  const url = getCdnUrl(session.owner, activeRepo.repo, activeRepo.branch, file.path);
-                  onCopyTreeCdn(url);
-                };
-
-                return (
-                  <tr key={idx} className={isHog ? 'hog-row' : ''}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {getTreeFileIcon()}
-                        <span className="file-path-text" title={file.path}>{file.path}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`file-size-text ${isHog ? 'text-warning font-semibold' : ''}`}>
-                        {formatBytes(file.size || 0)}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button
-                          className="btn-icon"
-                          onClick={handleCopyTreeCdnClick}
-                          title="Copy CDN Link"
-                        >
-                          <Copy size={13} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          onClick={() => onLocateFile(file.path, file.sha)}
-                          title="Locate in Explorer"
-                        >
-                          <ExternalLink size={13} />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          style={{ color: 'var(--danger)' }}
-                          onClick={() => onDeleteTreeFile(file.path, file.sha)}
-                          title="Delete File"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {largestFiles.length === 0 && (
-                <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                    No files found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <LargestFilesTable 
+        largestFiles={largestFiles}
+        session={session}
+        activeRepo={activeRepo}
+        formatBytes={formatBytes}
+        onLocateFile={onLocateFile}
+        onCopyTreeCdn={onCopyTreeCdn}
+        onDeleteTreeFile={onDeleteTreeFile}
+      />
     </div>
   );
 };

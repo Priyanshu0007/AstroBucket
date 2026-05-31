@@ -1,0 +1,208 @@
+/* Explorer view elements */
+.workspace-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  animation: fadeIn 0.3s ease;
+}
+
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-back-dashboard {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-back-dashboard:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  transform: translateX(-2px);
+}
+
+.branch-badge {
+  font-size: 0.725rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+/* File Search Bar */
+.search-bar-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-bar-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-bar-input {
+  padding-left: 2.25rem !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  border-radius: 50%;
+}
+
+.search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+/* ==========================================================================
+   Google Drive-like Explorer Layouts & Interactive CSS
+   ========================================================================== */
+
+/* Toggle view modes */
+.view-mode-toggle button {
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.view-mode-toggle button.active-toggle {
+  opacity: 1;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+/* Selected state */
+.file-item.selected {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.06);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+}
+
+/* List view table styles */
+.file-list-view {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.file-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.925rem;
+}
+
+.file-list-table th, 
+.file-list-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.file-list-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.file-list-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.file-list-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.file-list-table tbody tr.selected {
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid var(--primary);
+}
+
+.file-list-name-text {
+  font-weight: 500;
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+/* Context Menu */
+.context-menu {
+  background: rgba(15, 17, 23, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  border-radius: 10px;
+  padding: 0.35rem;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.context-menu-item, 
+.context-menu-item-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.context-menu-item-link {
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.context-menu-item:hover, 
+.context-menu-item-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.context-menu-item.text-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 0.3rem 0;
+}

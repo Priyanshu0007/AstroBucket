@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, 
   ChevronLeft, 
@@ -9,8 +9,6 @@ import {
   Minimize2, 
   ZoomIn, 
   ZoomOut, 
-  RefreshCw, 
-  AlertTriangle,
   FileText,
   Check,
   Sliders
@@ -19,10 +17,9 @@ import type { GithubFile } from '../api/types';
 import type { GithubSession } from '../App';
 import type { AttachedRepo } from './FileExplorer/types';
 import { fetchFileRaw, getCdnUrl } from '../api/client';
-import { marked } from 'marked';
 import * as XLSX from 'xlsx';
-import { renderAsync } from 'docx-preview';
 import { ImageEditor } from './ImageEditor';
+import { MediaPreviewContent } from './MediaPreviewContent';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -75,8 +72,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
 
-  const docxContainerRef = useRef<HTMLDivElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
+  const modalRef = React.useRef<HTMLDivElement>(null);
 
   // Filter out directories from the carousel list
   const previewableFiles = files.filter(f => f.type === 'file');
@@ -253,22 +249,6 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     }
   };
 
-  // Render Docx
-  useEffect(() => {
-    if (fileType === 'document' && docxBlob && docxContainerRef.current) {
-      docxContainerRef.current.innerHTML = '';
-      renderAsync(docxBlob, docxContainerRef.current, undefined, {
-        className: 'docx-preview-output',
-        inWrapper: false
-      }).catch(err => {
-        console.error('Docx rendering error:', err);
-        if (docxContainerRef.current) {
-          docxContainerRef.current.innerHTML = `<div class="p-6 text-center text-red-500">Failed to render document visual preview.</div>`;
-        }
-      });
-    }
-  }, [docxBlob, fileType, loading]);
-
   // Clean up Object URL on unmount
   useEffect(() => {
     return () => {
@@ -332,179 +312,6 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="preview-loading">
-          <RefreshCw size={40} className="spin text-primary" />
-          <span>Fetching file stream...</span>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="preview-error">
-          <AlertTriangle size={48} className="text-danger" />
-          <h3>Unable to Load Preview</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary" onClick={handleDownload}>
-            <Download size={16} /> Download File Instead
-          </button>
-        </div>
-      );
-    }
-
-    switch (fileType) {
-      case 'image':
-        return (
-          <div className="preview-image-container" style={{ overflow: 'auto' }}>
-            <img 
-              src={objectUrl || undefined} 
-              alt={file.name} 
-              className="preview-image" 
-              style={{ transform: `scale(${zoomLevel})`, transition: 'transform 0.15s ease' }}
-            />
-          </div>
-        );
-
-      case 'video':
-        return (
-          <div className="preview-video-container">
-            <video 
-              src={objectUrl || undefined} 
-              controls 
-              autoPlay
-              className="preview-video"
-            />
-          </div>
-        );
-
-      case 'audio':
-        return (
-          <div className="preview-audio-container">
-            <div className="audio-card glass-panel">
-              <FileText size={48} className="text-primary" style={{ marginBottom: '1rem' }} />
-              <h4 style={{ marginBottom: '1rem' }}>{file.name}</h4>
-              <audio 
-                src={objectUrl || undefined} 
-                controls 
-                autoPlay
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-        );
-
-      case 'pdf':
-        return (
-          <div className="preview-pdf-container">
-            <object 
-              data={objectUrl || undefined} 
-              type="application/pdf" 
-              width="100%" 
-              height="100%"
-            >
-              <iframe 
-                src={objectUrl || undefined} 
-                width="100%" 
-                height="100%" 
-                title={file.name}
-              />
-            </object>
-          </div>
-        );
-
-      case 'markdown':
-        return (
-          <div className="preview-markdown-container markdown-body">
-            <div 
-              dangerouslySetInnerHTML={{ __html: marked.parse(textContent, { async: false }) }} 
-            />
-          </div>
-        );
-
-      case 'code':
-      case 'text':
-        return (
-          <div className="preview-code-container">
-            <pre className="code-block">
-              <code>{textContent}</code>
-            </pre>
-          </div>
-        );
-
-      case 'spreadsheet':
-        return (
-          <div className="preview-spreadsheet-container">
-            {sheetNames.length > 1 && (
-              <div className="spreadsheet-tabs">
-                {sheetNames.map((name, idx) => (
-                  <button 
-                    key={idx}
-                    className={`sheet-tab ${activeSheetIdx === idx ? 'active' : ''}`}
-                    onClick={() => handleSheetChange(idx)}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="spreadsheet-table-wrapper">
-              <table className="excel-table">
-                <tbody>
-                  {sheetData.map((row, rowIdx) => (
-                    <tr key={rowIdx}>
-                      <td className="row-number-cell">{rowIdx + 1}</td>
-                      {row.map((cell, cellIdx) => (
-                        <td key={cellIdx} className="excel-cell">
-                          {cell !== undefined && cell !== null ? String(cell) : ''}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  {sheetData.length === 0 && (
-                    <tr>
-                      <td style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                        This sheet is empty.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-
-      case 'document':
-        return (
-          <div className="preview-docx-container">
-            <div ref={docxContainerRef} className="docx-render-target" />
-          </div>
-        );
-
-      default:
-        return (
-          <div className="preview-fallback-container">
-            <FileText size={80} className="text-muted" style={{ marginBottom: '1.5rem', opacity: 0.5 }} />
-            <h3>No Preview Available</h3>
-            <p className="text-muted" style={{ marginBottom: '1.5rem' }}>
-              Preview for {(file.name.split('.').pop() || 'unknown').toUpperCase()} files is not supported.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn btn-primary" onClick={handleDownload}>
-                <Download size={16} /> Download to View
-              </button>
-              <button className="btn btn-outline" onClick={handleCopyCdn}>
-                {copied ? <Check size={16} style={{ color: '#10b981' }} /> : <Copy size={16} />} 
-                {copied ? 'Copied!' : 'Copy CDN Link'}
-              </button>
-            </div>
-          </div>
-        );
-    }
-  };
 
   return (
     <div className={`preview-modal-overlay ${isFullscreen ? 'fullscreen' : ''}`} ref={modalRef}>
@@ -597,7 +404,23 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           )}
 
           <div className="preview-content-box">
-            {renderContent()}
+            <MediaPreviewContent
+              loading={loading}
+              error={error}
+              fileType={fileType}
+              file={file}
+              objectUrl={objectUrl}
+              zoomLevel={zoomLevel}
+              textContent={textContent}
+              sheetNames={sheetNames}
+              sheetData={sheetData}
+              activeSheetIdx={activeSheetIdx}
+              handleSheetChange={handleSheetChange}
+              docxBlob={docxBlob}
+              copied={copied}
+              handleDownload={handleDownload}
+              handleCopyCdn={handleCopyCdn}
+            />
           </div>
 
           {previewableFiles.length > 1 && (

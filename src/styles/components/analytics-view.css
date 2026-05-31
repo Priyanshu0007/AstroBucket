@@ -1,0 +1,569 @@
+/* ==========================================================================
+   Storage Analytics Dashboard Styles
+   ========================================================================== */
+
+.workspace-tabs-container {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.workspace-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.workspace-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+}
+
+.workspace-tab.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05);
+}
+
+.analytics-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: fadeIn 0.4s ease;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.metric-card {
+  padding: 1.5rem;
+  border-radius: 14px;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.metric-card-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-card-icon {
+  opacity: 0.85;
+}
+
+.metric-value-container {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 0.2rem;
+}
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+
+.metric-limit {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.metric-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: auto;
+}
+
+.metric-stats-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: auto;
+}
+
+.bullet-separator {
+  color: rgba(255, 255, 255, 0.12);
+}
+
+.metric-progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+  width: 100%;
+}
+
+.metric-progress-bar-container {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metric-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #a855f7);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+.metric-progress-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: right;
+  font-weight: 500;
+}
+
+.analytics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  margin-bottom: 0;
+}
+
+.analytics-section .section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.analytics-section .section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* Segmented Progress Chart */
+.distribution-bar-container {
+  width: 100%;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.distribution-bar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+.distribution-segment {
+  height: 100%;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.distribution-segment:hover {
+  transform: scaleY(1.18);
+  opacity: 0.9;
+  z-index: 2;
+}
+
+/* Distribution Legend Grid */
+.distribution-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.875rem;
+}
+
+.legend-item {
+  padding: 0.875rem;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--glass-border);
+}
+
+.legend-item.glass-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.legend-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.legend-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 0.15rem;
+}
+
+.legend-size {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  font-family: var(--font-display);
+}
+
+.legend-percentage {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.legend-footer {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Largest Files Table Styles */
+.largest-files-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.largest-files-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.largest-files-table th {
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.largest-files-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: middle;
+}
+
+.largest-files-table tr:last-child td {
+  border-bottom: none;
+}
+
+.largest-files-table tr {
+  transition: background-color 0.15s ease;
+}
+
+.largest-files-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+
+.largest-files-table tr.hog-row {
+  background-color: rgba(245, 158, 11, 0.015);
+}
+
+.largest-files-table tr.hog-row:hover {
+  background-color: rgba(245, 158, 11, 0.03);
+}
+
+.file-path-text {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size-text {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.text-warning {
+  color: #fbbf24;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+/* Analytics Error Banner */
+.analytics-error-banner {
+  background: rgba(239, 68, 68, 0.02);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+/* Custom Interactive SVG Charts Layout */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* Donut Chart Visual Styles */
+.donut-chart-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  padding: 1rem 0;
+}
+
+.donut-chart-wrapper {
+  position: relative;
+  width: 220px;
+  height: 220px;
+}
+
+.donut-center-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 110px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.donut-center-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+  transition: color 0.2s ease;
+}
+
+.donut-center-val {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+  transition: color 0.2s ease;
+}
+
+.donut-center-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.donut-segment {
+  cursor: pointer;
+  transform-origin: center;
+  transition: stroke-width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.3s ease,
+              opacity 0.2s ease;
+}
+
+/* Dim segments when one is hovered */
+.donut-svg:hover .donut-segment:not(.hovered) {
+  opacity: 0.45;
+}
+
+.donut-svg .donut-segment.hovered {
+  opacity: 1;
+  z-index: 10;
+}
+
+/* Legend items interactive styling */
+.legend-item.interactive {
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.legend-item.interactive:hover,
+.legend-item.interactive.highlighted {
+  border-color: var(--highlight-color, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Area Chart Styling */
+.area-chart-container {
+  position: relative;
+  width: 100%;
+  height: 220px;
+}
+
+.area-chart-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart-grid-line {
+  stroke: rgba(255, 255, 255, 0.03);
+  stroke-width: 1;
+}
+
+.chart-grid-line.dashed {
+  stroke-dasharray: 4 4;
+}
+
+.chart-axis-text {
+  font-size: 0.65rem;
+  fill: var(--text-muted);
+  font-weight: 500;
+}
+
+.chart-growth-line {
+  stroke-linecap: round;
+  transition: stroke-dashoffset 2s ease-in-out;
+}
+
+.chart-growth-node {
+  cursor: pointer;
+  transition: r 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              stroke-width 0.25s ease,
+              filter 0.25s ease;
+}
+
+.chart-growth-node.active {
+  filter: drop-shadow(0 0 8px var(--node-color, #a855f7));
+}
+
+.chart-hover-line {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.chart-interactive-bar {
+  cursor: pointer;
+}
+
+/* Glassmorphic tooltips */
+.chart-tooltip {
+  position: absolute;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 15, 25, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-main);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5),
+              0 0 15px rgba(168, 85, 247, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  font-family: var(--font-sans);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transform: translate(-50%, -105%);
+}
+
+.chart-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: rgba(15, 15, 25, 0.85);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chart-tooltip-header {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 3px;
+  margin-bottom: 2px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  font-size: 0.8rem;
+}
+
+.chart-tooltip-label {
+  color: var(--text-muted);
+}
+
+.chart-tooltip-value {
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+
+

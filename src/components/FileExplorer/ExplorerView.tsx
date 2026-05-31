@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { GithubFile } from '../../api/types';
 import type { GithubSession } from '../../App';
 import type { AttachedRepo } from './types';
@@ -8,13 +8,8 @@ import {
   File as FileIcon, 
   Image as ImageIcon, 
   Code, 
-  Upload, 
   Trash2, 
   Copy,
-  ChevronRight,
-  Home,
-  RefreshCw,
-  ExternalLink,
   Plus,
   Search,
   X,
@@ -23,8 +18,14 @@ import {
   List,
   FileText,
   Video,
-  Music
+  Music,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
+import { Breadcrumbs } from './Breadcrumbs';
+import { UploadZone } from './UploadZone';
+import { FolderCreationModal } from './FolderCreationModal';
+import { ExplorerContextMenu } from './ExplorerContextMenu';
 
 interface ExplorerViewProps {
   session: GithubSession;
@@ -43,63 +44,6 @@ interface ExplorerViewProps {
   onPreviewFile: (file: GithubFile) => void;
   onCreateFolder: (folderName: string) => Promise<void>;
 }
-
-const getFilesFromEntry = async (entry: any): Promise<{ file: File; relativePath: string }[]> => {
-  if (entry.isFile) {
-    return new Promise((resolve) => {
-      entry.file((file: File) => {
-        const cleanPath = entry.fullPath.startsWith('/') 
-          ? entry.fullPath.substring(1) 
-          : entry.fullPath;
-        resolve([{ file, relativePath: cleanPath }]);
-      });
-    });
-  } else if (entry.isDirectory) {
-    const dirReader = entry.createReader();
-    const readEntries = (): Promise<any[]> => {
-      return new Promise((resolve, reject) => {
-        dirReader.readEntries(resolve, reject);
-      });
-    };
-
-    try {
-      let entries: any[] = [];
-      let readBatch = await readEntries();
-      while (readBatch.length > 0) {
-        entries = entries.concat(readBatch);
-        readBatch = await readEntries();
-      }
-
-      const results = await Promise.all(
-        entries.map((childEntry) => getFilesFromEntry(childEntry))
-      );
-      return results.flat();
-    } catch (err) {
-      console.error('Error reading directory entries', err);
-      return [];
-    }
-  }
-  return [];
-};
-
-const parseDroppedItems = async (items: DataTransferItemList): Promise<{ file: File; relativePath: string }[]> => {
-  const entries: any[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    if (item.kind === 'file') {
-      const entry = item.webkitGetAsEntry();
-      if (entry) {
-        entries.push(entry);
-      }
-    }
-  }
-
-  if (entries.length > 0) {
-    const fileLists = await Promise.all(entries.map(entry => getFilesFromEntry(entry)));
-    return fileLists.flat();
-  }
-  return [];
-};
 
 export const ExplorerView: React.FC<ExplorerViewProps> = ({
   session,
@@ -120,14 +64,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 }) => {
   const [fileSearch, setFileSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [dragActive, setDragActive] = useState(false);
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; file: GithubFile } | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Click outside to clear selection / context menu
+  // Click outside to clear context menu
   useEffect(() => {
     const handleClickOutside = () => {
       setContextMenu(null);
@@ -177,111 +117,22 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     });
   };
 
-  const handleFileDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (uploading) return;
-    
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      try {
-        const filesList = await parseDroppedItems(e.dataTransfer.items);
-        if (filesList.length > 0) {
-          onUpload(filesList);
-        }
-      } catch (err) {
-        console.error('Error scanning dropped files:', err);
-      }
-    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filesList = Array.from(e.dataTransfer.files).map(file => ({
-        file,
-        relativePath: file.name
-      }));
-      onUpload(filesList);
-    }
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (uploading) return;
-    if (e.target.files && e.target.files.length > 0) {
-      const filesList = Array.from(e.target.files).map(file => ({
-        file,
-        relativePath: file.name
-      }));
-      onUpload(filesList);
-      
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleCreateFolderSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFolderName.trim()) return;
-    await onCreateFolder(newFolderName.trim());
-    setNewFolderName('');
-    setIsCreateFolderOpen(false);
-  };
-
-  const breadcrumbParts = currentPath.split('/').filter(Boolean);
   const filteredFiles = files.filter(f => 
     f.name.toLowerCase().includes(fileSearch.toLowerCase())
   );
 
   return (
     <>
-      {/* Breadcrumbs Navigation */}
-      <div className="breadcrumbs">
-        <div 
-          className={`breadcrumb-item ${breadcrumbParts.length === 0 ? 'breadcrumb-active' : ''}`}
-          onClick={() => onNavigate('')}
-          style={{ display: 'flex', alignItems: 'center' }}
-        >
-          <Home size={14} style={{ marginRight: '4px' }}/> Root
-        </div>
-        
-        {breadcrumbParts.map((part, index) => (
-          <React.Fragment key={index}>
-            <ChevronRight size={14} className="breadcrumb-separator" />
-            <div 
-              className={`breadcrumb-item ${index === breadcrumbParts.length - 1 ? 'breadcrumb-active' : ''}`}
-              onClick={() => onBreadcrumbClick(index)}
-            >
-              {part}
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
+      <Breadcrumbs 
+        currentPath={currentPath}
+        onNavigate={onNavigate}
+        onBreadcrumbClick={onBreadcrumbClick}
+      />
 
-      {/* Drag & Drop Upload Zone */}
-      <div 
-        className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
-        style={{ marginBottom: '1.5rem' }}
-        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); }}
-        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); }}
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onDrop={handleFileDrop}
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <input 
-          type="file" 
-          style={{ display: 'none' }} 
-          ref={fileInputRef} 
-          onChange={handleFileInput}
-          multiple
-        />
-        <Upload size={40} className={uploading ? 'spin' : ''} style={{ color: uploading ? 'var(--primary)' : 'var(--text-muted)' }} />
-        {uploading ? (
-          <h3 className="text-primary" style={{ fontSize: '1.1rem' }}>Uploading files... (see progress panel)</h3>
-        ) : (
-          <div>
-            <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Drag & Drop to upload files or folders</h3>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>or click to select multiple files from your machine</p>
-          </div>
-        )}
-      </div>
+      <UploadZone 
+        uploading={uploading}
+        onUpload={onUpload}
+      />
 
       {/* File List Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
@@ -482,8 +333,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                             <button 
                               className="btn-icon" 
                               onClick={(e) => {
-                                e.stopPropagation();
-                                onCopyCdn(file);
+                                  e.stopPropagation();
+                                  onCopyCdn(file);
                               }}
                               title="Copy CDN"
                             >
@@ -529,95 +380,21 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         </>
       )}
 
-      {/* Folder Creation Modal */}
-      {isCreateFolderOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Create New Folder</h2>
-              <button className="btn-icon" onClick={() => setIsCreateFolderOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateFolderSubmit}>
-              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="input-label">Folder Name</label>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="e.g. assets" 
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  autoFocus
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', justifySelf: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" className="btn btn-outline" onClick={() => setIsCreateFolderOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Create Folder
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Folder Creation Modal Overlay */}
+      <FolderCreationModal 
+        isOpen={isCreateFolderOpen}
+        onClose={() => setIsCreateFolderOpen(false)}
+        onCreateFolder={onCreateFolder}
+      />
 
       {/* Right-click Context Menu */}
-      {contextMenu && (
-        <div 
-          className="context-menu glass-panel" 
-          style={{ 
-            position: 'fixed',
-            top: contextMenu.y, 
-            left: contextMenu.x,
-            zIndex: 1000 
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {contextMenu.file.type === 'file' && (
-            <button 
-              className="context-menu-item" 
-              onClick={() => {
-                onPreviewFile(contextMenu.file);
-                setContextMenu(null);
-              }}
-            >
-              <Eye size={14} /> Preview File
-            </button>
-          )}
-          <button 
-            className="context-menu-item" 
-            onClick={() => {
-              onCopyCdn(contextMenu.file);
-              setContextMenu(null);
-            }}
-          >
-            <Copy size={14} /> Copy CDN Link
-          </button>
-          <a 
-            href={contextMenu.file.html_url} 
-            target="_blank" 
-            rel="noreferrer"
-            className="context-menu-item-link"
-            onClick={() => setContextMenu(null)}
-          >
-            <ExternalLink size={14} /> Open on GitHub
-          </a>
-          <div className="context-menu-divider" />
-          <button 
-            className="context-menu-item text-danger" 
-            onClick={() => {
-              onDelete(contextMenu.file);
-              setContextMenu(null);
-            }}
-          >
-            <Trash2 size={14} /> Delete
-          </button>
-        </div>
-      )}
+      <ExplorerContextMenu 
+        contextMenu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onPreviewFile={onPreviewFile}
+        onCopyCdn={onCopyCdn}
+        onDelete={onDelete}
+      />
     </>
   );
 };
