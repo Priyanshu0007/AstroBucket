@@ -7,20 +7,23 @@ import type {
   GithubTreeItem
 } from './types';
 
+let decryptedToken: string | null = null;
+
+export const setDecryptedToken = (token: string | null) => {
+  decryptedToken = token;
+};
+
+export const getDecryptedToken = () => decryptedToken;
+
 export const apiClient = axios.create({
   baseURL: 'https://api.github.com',
 });
 
 apiClient.interceptors.request.use((config) => {
-  const sessionStr = localStorage.getItem('astrobucket-session');
-  if (sessionStr) {
-    try {
-      const session = JSON.parse(sessionStr);
-      if (session.token) {
-        config.headers.Authorization = `Bearer ${session.token}`;
-      }
-    } catch (e) {
-      console.error('Error parsing session for API request', e);
+  if (!config.headers.Authorization) {
+    const token = getDecryptedToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
   }
   if (!config.headers.Accept) {
@@ -54,7 +57,8 @@ export const fetchUserProfile = async (token?: string, owner?: string): Promise<
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  const response = await apiClient.get<GithubProfile>(`/users/${owner}`, { headers });
+  const url = owner ? `/users/${owner}` : '/user';
+  const response = await apiClient.get<GithubProfile>(url, { headers });
   return response.data;
 };
 
