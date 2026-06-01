@@ -103,6 +103,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       a: "Absolutely. AstroBucket acts 100% client-side. Token requests are processed through a serverless exchange proxy, and the resulting OAuth tokens are stored directly in your browser's local storage. No user data or credentials ever touch third-party middleman databases."
     },
     {
+      q: "Does AstroBucket work with private repositories?",
+      a: "Yes! AstroBucket securely reads and writes files inside private repositories on-device. However, jsDelivr CDN links require a public repository. CDN links generated for private repositories will not resolve publicly and will return 403/404 errors."
+    },
+    {
       q: "Are there any storage limits or bandwidth costs?",
       a: "AstroBucket is entirely free. All file storage limits depend on GitHub's repository rules (typically up to 1GB - 5GB for standard repos). Global CDN hosting is provided by jsDelivr with infinite bandwidth and no fees."
     },
@@ -343,7 +347,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="step-card">
             <div className="step-number">2</div>
             <h3>Attach Repositories</h3>
-            <p>Select from your list of available repositories or manually specify your desired storage branch to spin up a bucket.</p>
+            <p>Select from your available public or private repositories. (Note: Public repositories are required if you want public CDN links to resolve).</p>
           </div>
 
           <div className="step-card">

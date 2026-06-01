@@ -596,6 +596,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                   refetchContents();
                   refetchRepoTree();
                 }}
+                isPrivate={isPrivate}
               />
             ) : (
               <AnalyticsView 
@@ -649,7 +650,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
       )}
 
       {/* Glowing Toast Notification on Copy success */}
-      <ToastNotification copiedFileUrl={copiedFileUrl} />
+      <ToastNotification copiedFileUrl={copiedFileUrl} isPrivate={isPrivate} />
 
       {/* Batch Operations Progress Modal */}
       {batchProgress && batchProgress.isOpen && (

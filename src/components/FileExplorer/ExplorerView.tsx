@@ -23,7 +23,8 @@ import {
   ExternalLink,
   RefreshCw,
   MapPin,
-  Download
+  Download,
+  AlertCircle
 } from 'lucide-react';
 import { Breadcrumbs } from './Breadcrumbs';
 import { UploadZone } from './UploadZone';
@@ -51,6 +52,7 @@ interface ExplorerViewProps {
   onBatchDelete?: (items: GithubFile[]) => Promise<void>;
   onBatchDownload?: (items: GithubFile[]) => Promise<void>;
   onRefresh?: () => void;
+  isPrivate?: boolean;
 }
 
 export const ExplorerView: React.FC<ExplorerViewProps> = ({
@@ -72,7 +74,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   repoTree = [],
   onBatchDelete,
   onBatchDownload,
-  onRefresh
+  onRefresh,
+  isPrivate = false
 }) => {
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -245,7 +248,11 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       .map(file => getCdnUrl(session.owner, activeRepo.repo, activeRepo.branch, file.path))
       .join('\n');
     navigator.clipboard.writeText(urls);
-    alert(`Copied CDN links for ${fileItems.length} file(s) to clipboard.`);
+    if (isPrivate) {
+      alert(`🔒 Copied CDN links for ${fileItems.length} file(s) to clipboard!\n\nNote: This repository is PRIVATE. These CDN links will NOT resolve publicly.`);
+    } else {
+      alert(`Copied CDN links for ${fileItems.length} file(s) to clipboard.`);
+    }
     setSelectedItems([]);
   };
 
@@ -397,6 +404,28 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         uploading={uploading}
         onUpload={onUpload}
       />
+
+      {isPrivate && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.05)',
+          border: '1px solid rgba(239, 68, 68, 0.15)',
+          borderRadius: '8px',
+          padding: '0.65rem 1rem',
+          fontSize: '0.85rem',
+          color: '#f87171',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginTop: '1rem',
+          marginBottom: '0.5rem',
+          lineHeight: '1.4'
+        }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>
+            <strong>🔒 Private Repository:</strong> Assets are served securely. Note that jsDelivr CDN links will <strong>not resolve publicly</strong> because the CDN cannot access private code.
+          </span>
+        </div>
+      )}
 
       {/* Floating Batch Action Bar */}
       {selectedItems.length > 0 && (

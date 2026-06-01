@@ -94,6 +94,27 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
             <strong>Tip:</strong> We recommend attaching repositories owned by a <strong>secondary/burner GitHub account</strong>. Since uploads write commits directly to your repos, this prevents polluting your primary developer account's contribution graphs and commit histories.
           </span>
         </div>
+
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '1px solid rgba(59, 130, 246, 0.15)',
+          borderRadius: '8px',
+          padding: '0.75rem 1rem',
+          fontSize: '0.85rem',
+          color: '#60a5fa',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          maxWidth: '650px',
+          lineHeight: '1.4',
+          textAlign: 'left',
+          marginTop: '0.75rem'
+        }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>
+            <strong>🔒 Private Repositories:</strong> Private repositories are fully supported for secure file operations. However, please note that jsDelivr CDN links will <strong>not resolve publicly</strong> for private repos (returning 403/404 errors) as the CDN cannot access private code.
+          </span>
+        </div>
       </div>
 
       {/* Connected Repos Grid */}
