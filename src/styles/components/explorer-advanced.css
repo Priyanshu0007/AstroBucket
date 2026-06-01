@@ -1,0 +1,278 @@
+/* Drag and Drop visual states */
+.file-item.drag-over {
+  border-color: #a855f7 !important;
+  background: rgba(168, 85, 247, 0.08) !important;
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.2) !important;
+  transform: scale(1.02);
+}
+
+.file-list-table tbody tr.drag-over {
+  background: rgba(168, 85, 247, 0.06) !important;
+  border-left: 3px solid #a855f7 !important;
+}
+
+/* Draggable item pointer cursor */
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
+
+/* Spinner overlay for moving / uploading elements */
+.item-moving-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 17, 23, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  animation: fadeIn 0.2s ease;
+}
+
+/* Checkbox wrapper for Grid Cards */
+.file-item-checkbox-wrapper {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  z-index: 25;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.file-item:hover .file-item-checkbox-wrapper,
+.file-item-checkbox-wrapper.has-selection {
+  opacity: 1;
+}
+
+.file-checkbox {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.file-checkbox:hover {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.05);
+}
+
+.file-checkbox:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.file-checkbox:checked::after {
+  content: '';
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+/* Checkbox Column List View */
+.checkbox-column {
+  width: 40px;
+  text-align: center;
+  padding: 1rem 0.5rem !important;
+}
+
+/* Floating Glassmorphic Batch Action Bar */
+.batch-action-bar {
+  position: sticky;
+  top: 0.5rem;
+  left: 0;
+  right: 0;
+  z-index: 35;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.5rem;
+  margin-bottom: 1.25rem;
+  border-radius: 12px;
+  background: rgba(15, 17, 23, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.batch-action-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.batch-action-count {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.batch-action-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Global Search Dropdown Overlay */
+.search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 380px;
+  background: rgba(13, 15, 20, 0.96);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  z-index: 45;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.search-results-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+.search-results-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+.search-results-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.search-results-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.search-result-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.search-result-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.search-result-icon {
+  flex-shrink: 0;
+}
+
+.search-result-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-main);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.search-result-path {
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.search-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.search-result-item:hover .search-result-actions {
+  opacity: 1;
+}
+
+/* Locate Pulse Animation */
+@keyframes pulseHighlight {
+  0% {
+    box-shadow: 0 0 0 0px rgba(168, 85, 247, 0.8);
+    border-color: #a855f7;
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(168, 85, 247, 0.5);
+    border-color: #a855f7;
+  }
+  100% {
+    box-shadow: 0 0 0 0px rgba(168, 85, 247, 0);
+  }
+}
+
+.pulse-highlight {
+  animation: pulseHighlight 1.5s ease-in-out 2;
+}
+
+/* Concurrency progress modal */
+.progress-modal {
+  max-width: 400px !important;
+}
+
+.progress-header {
+  margin-bottom: 1rem;
+}
+
+.progress-bar-wrapper {
+  margin-bottom: 1.5rem;
+}

@@ -2,6 +2,7 @@
 @import './components/sidebar.css';
 @import './components/welcome-dashboard.css';
 @import './components/explorer-view.css';
+@import './components/explorer-advanced.css';
 @import './components/preview-modal.css';
 @import './components/analytics-view.css';
 

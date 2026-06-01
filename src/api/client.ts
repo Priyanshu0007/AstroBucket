@@ -110,7 +110,7 @@ export const fetchContents = async (
 
   try {
     const response = await apiClient.get(`/repos/${owner}/${repo}/contents/${path}`, {
-      params: { ref: branch },
+      params: { ref: branch, _: Date.now() },
       headers
     });
     const data = response.data;
@@ -206,7 +206,7 @@ export const fetchRepoTree = async (
   }
 
   const response = await apiClient.get(`/repos/${owner}/${repo}/git/trees/${branch}`, {
-    params: { recursive: '1' },
+    params: { recursive: '1', _: Date.now() },
     headers
   });
   return response.data.tree || [];

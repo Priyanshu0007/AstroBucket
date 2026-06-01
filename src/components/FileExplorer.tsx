@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { GithubFile } from '../api/types';
-import { getCdnUrl } from '../api/client';
+import { getCdnUrl, fetchFileRaw } from '../api/client';
+import JSZip from 'jszip';
 import {
   useUserProfile,
   useUserRepos,
@@ -48,6 +49,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
 
   // Copy success notification state
   const [copiedFileUrl, setCopiedFileUrl] = useState<string | null>(null);
+
+  // Batch Progress state
+  const [batchProgress, setBatchProgress] = useState<{
+    isOpen: boolean;
+    title: string;
+    current: number;
+    total: number;
+    status: string;
+  } | null>(null);
 
   // Analytics Dashboard states
   const [activeTab, setActiveTab] = useState<'explorer' | 'analytics'>('explorer');
@@ -304,6 +314,196 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
     refetchRepoTree
   });
 
+  // Batch operations handlers
+  const handleBatchDelete = async (items: GithubFile[]) => {
+    if (!activeRepo) return;
+    const itemLabel = items.length === 1 ? 'item' : 'items';
+    if (!confirm(`Are you sure you want to delete the ${items.length} selected ${itemLabel}?`)) return;
+
+    // Resolve directories to flat files list
+    const filesToDelete: { path: string; sha: string }[] = [];
+    for (const item of items) {
+      if (item.type === 'file') {
+        filesToDelete.push({ path: item.path, sha: item.sha });
+      } else {
+        const prefix = item.path.endsWith('/') ? item.path : `${item.path}/`;
+        const nested = repoTree.filter(t => t.type === 'blob' && t.path.startsWith(prefix));
+        for (const file of nested) {
+          filesToDelete.push({ path: file.path, sha: file.sha });
+        }
+      }
+    }
+
+    if (filesToDelete.length === 0) {
+      alert('No files found to delete.');
+      return;
+    }
+
+    setBatchProgress({
+      isOpen: true,
+      title: 'Deleting Files',
+      current: 0,
+      total: filesToDelete.length,
+      status: 'Initializing batch deletion...'
+    });
+
+    const creds = {
+      token: session.token,
+      owner: session.owner,
+      repo: activeRepo.repo,
+      branch: activeRepo.branch
+    };
+
+    const limit = 3;
+    let currentIndex = 0;
+    let completed = 0;
+
+    const runNext = async (): Promise<void> => {
+      if (currentIndex >= filesToDelete.length) return;
+      const taskIndex = currentIndex++;
+      const file = filesToDelete[taskIndex];
+
+      try {
+        setBatchProgress(prev => prev ? {
+          ...prev,
+          status: `Deleting: ${file.path.split('/').pop()}`
+        } : null);
+
+        await deleteMutation.mutateAsync({
+          creds,
+          path: file.path,
+          sha: file.sha,
+          message: 'Batch delete via AstroBucket'
+        });
+      } catch (err) {
+        console.error(`Failed to delete ${file.path}:`, err);
+      } finally {
+        completed++;
+        setBatchProgress(prev => prev ? {
+          ...prev,
+          current: completed
+        } : null);
+        await runNext();
+      }
+    };
+
+    const workers = Array(Math.min(limit, filesToDelete.length))
+      .fill(null)
+      .map(() => runNext());
+    
+    await Promise.all(workers);
+
+    setBatchProgress(null);
+    refetchContents();
+    refetchRepoTree();
+  };
+
+  const handleBatchDownload = async (items: GithubFile[]) => {
+    if (!activeRepo) return;
+
+    // Resolve directories to flat files list
+    const filesToDownload: string[] = [];
+    for (const item of items) {
+      if (item.type === 'file') {
+        filesToDownload.push(item.path);
+      } else {
+        const prefix = item.path.endsWith('/') ? item.path : `${item.path}/`;
+        const nested = repoTree.filter(t => t.type === 'blob' && t.path.startsWith(prefix));
+        for (const file of nested) {
+          filesToDownload.push(file.path);
+        }
+      }
+    }
+
+    if (filesToDownload.length === 0) {
+      alert('No files found to download.');
+      return;
+    }
+
+    setBatchProgress({
+      isOpen: true,
+      title: 'Downloading Files',
+      current: 0,
+      total: filesToDownload.length,
+      status: 'Preparing ZIP bundle...'
+    });
+
+    const creds = {
+      token: session.token,
+      owner: session.owner,
+      repo: activeRepo.repo,
+      branch: activeRepo.branch
+    };
+
+    const zip = new JSZip();
+    const limit = 4;
+    let currentIndex = 0;
+    let completed = 0;
+
+    const runNextDownload = async (): Promise<void> => {
+      if (currentIndex >= filesToDownload.length) return;
+      const taskIndex = currentIndex++;
+      const path = filesToDownload[taskIndex];
+
+      try {
+        setBatchProgress(prev => prev ? {
+          ...prev,
+          status: `Downloading: ${path.split('/').pop()}`
+        } : null);
+
+        const blob = await fetchFileRaw(creds, path);
+
+        // Determine zip relative path
+        let zipPath = path;
+        if (currentPath) {
+          const prefix = currentPath.endsWith('/') ? currentPath : `${currentPath}/`;
+          if (path.startsWith(prefix)) {
+            zipPath = path.substring(prefix.length);
+          }
+        }
+
+        zip.file(zipPath, blob);
+      } catch (err) {
+        console.error(`Failed to download ${path}:`, err);
+      } finally {
+        completed++;
+        setBatchProgress(prev => prev ? {
+          ...prev,
+          current: completed
+        } : null);
+        await runNextDownload();
+      }
+    };
+
+    const workers = Array(Math.min(limit, filesToDownload.length))
+      .fill(null)
+      .map(() => runNextDownload());
+
+    await Promise.all(workers);
+
+    setBatchProgress(prev => prev ? {
+      ...prev,
+      status: 'Generating ZIP archive...'
+    } : null);
+
+    try {
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${activeRepo.repo}-archive.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to generate zip:', err);
+      alert('Failed to bundle files into a ZIP.');
+    } finally {
+      setBatchProgress(null);
+    }
+  };
+
   const activeRepoDetails = githubRepos.find(r => r.name.toLowerCase() === activeRepo?.repo.toLowerCase());
   const isPrivate = activeRepoDetails ? activeRepoDetails.private : false;
 
@@ -389,6 +589,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
                 onDelete={handleDelete}
                 onPreviewFile={(file) => setPreviewFile(file)}
                 onCreateFolder={handleCreateFolder}
+                repoTree={repoTree}
+                onBatchDelete={handleBatchDelete}
+                onBatchDownload={handleBatchDownload}
+                onRefresh={() => {
+                  refetchContents();
+                  refetchRepoTree();
+                }}
               />
             ) : (
               <AnalyticsView 
@@ -443,6 +650,38 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
 
       {/* Glowing Toast Notification on Copy success */}
       <ToastNotification copiedFileUrl={copiedFileUrl} />
+
+      {/* Batch Operations Progress Modal */}
+      {batchProgress && batchProgress.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card progress-modal">
+            <header className="progress-header" style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{batchProgress.title}</h2>
+            </header>
+            <div className="progress-body">
+              <div className="overall-progress-info" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div className="overall-stats-text" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span className="text-muted" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+                    {batchProgress.status}
+                  </span>
+                  <span className="text-gradient" style={{ fontWeight: 600 }}>
+                    {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+                  </span>
+                </div>
+                <div className="progress-bar-container" style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div 
+                    className="progress-bar-fill" 
+                    style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--primary), #a855f7)', borderRadius: '4px', transition: 'width 0.2s ease' }}
+                  />
+                </div>
+                <span className="text-muted" style={{ fontSize: '0.75rem', textAlign: 'right', marginTop: '0.25rem' }}>
+                  Processed {batchProgress.current} of {batchProgress.total} items
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Progress Panel */}
       <UploadProgressPanel 
