@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import type { GithubSession } from '../../App';
 import type { GithubRepo } from '../../api/types';
 import type { AttachedRepo } from './types';
@@ -54,11 +55,12 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
       attachRepo(manualRepo.trim(), defaultBranch);
       setManualRepo('');
       setManualBranch('main');
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      const errMsg = err?.response?.status === 404
-        ? `Repository "${manualRepo.trim()}" not found or inaccessible under owner "${session.owner}".`
-        : (err.message || 'Verification failed. Check the repository name.');
+      let errMsg = err instanceof Error ? err.message : 'Verification failed. Check the repository name.';
+      if (axios.isAxiosError(err) && err.response?.status === 404) {
+        errMsg = `Repository "${manualRepo.trim()}" not found or inaccessible under owner "${session.owner}".`;
+      }
       setManualError(errMsg);
     } finally {
       setAttachingManual(false);

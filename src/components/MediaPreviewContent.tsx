@@ -15,7 +15,7 @@ interface MediaPreviewContentProps {
   zoomLevel: number;
   textContent: string;
   sheetNames: string[];
-  sheetData: any[][];
+  sheetData: (string | number | boolean | null | undefined)[][];
   activeSheetIdx: number;
   handleSheetChange: (idx: number) => void;
   docxBlob: Blob | null;

@@ -81,7 +81,14 @@ export const uploadFile = async (
   const { owner, repo, branch, token } = creds;
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
   
-  const body: any = {
+  interface UploadFileBody {
+    message: string;
+    content: string;
+    branch: string;
+    sha?: string;
+  }
+  
+  const body: UploadFileBody = {
     message,
     content: contentBase64,
     branch,
@@ -168,6 +175,20 @@ export interface GithubProfile {
   html_url: string;
 }
 
+export interface GithubRawRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  default_branch?: string;
+  description: string | null;
+  private: boolean;
+  html_url: string;
+  stargazers_count?: number;
+  owner: {
+    login: string;
+  };
+}
+
 export const fetchUserRepos = async (token: string, owner: string): Promise<GithubRepo[]> => {
   const headers = getHeaders(token);
   
@@ -179,10 +200,10 @@ export const fetchUserRepos = async (token: string, owner: string): Promise<Gith
   try {
     const response = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', { headers });
     if (response.ok) {
-      const data = await response.json();
-      const filtered = data.filter((repo: any) => repo.owner.login.toLowerCase() === owner.toLowerCase());
+      const data = await response.json() as GithubRawRepo[];
+      const filtered = data.filter((repo) => repo.owner.login.toLowerCase() === owner.toLowerCase());
       if (filtered.length > 0) {
-        return filtered.map((repo: any) => ({
+        return filtered.map((repo) => ({
           id: repo.id,
           name: repo.name,
           full_name: repo.full_name,
@@ -204,8 +225,8 @@ export const fetchUserRepos = async (token: string, owner: string): Promise<Gith
   if (!response.ok) {
     throw new Error(`GitHub API error: ${response.statusText}`);
   }
-  const data = await response.json();
-  return data.map((repo: any) => ({
+  const data = await response.json() as GithubRawRepo[];
+  return data.map((repo) => ({
     id: repo.id,
     name: repo.name,
     full_name: repo.full_name,

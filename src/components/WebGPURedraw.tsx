@@ -1,5 +1,86 @@
 import React, { useEffect, useRef } from 'react';
 
+interface GPU {
+  requestAdapter(): Promise<GPUAdapter | null>;
+  getPreferredCanvasFormat(): string;
+}
+
+interface GPUAdapter {
+  requestDevice(): Promise<GPUDevice | null>;
+}
+
+interface GPUDevice {
+  queue: {
+    writeBuffer(buffer: GPUBuffer, bufferOffset: number, data: BufferSource): void;
+    submit(commandBuffers: GPUCommandBuffer[]): void;
+  };
+  createShaderModule(desc: { code: string }): GPUShaderModule;
+  createBindGroupLayout(desc: { entries: { binding: number; visibility: number; buffer: { type: string } }[] }): GPUBindGroupLayout;
+  createPipelineLayout(desc: { bindGroupLayouts: GPUBindGroupLayout[] }): GPUPipelineLayout;
+  createRenderPipeline(desc: object): GPURenderPipeline;
+  createBuffer(desc: { size: number; usage: number }): GPUBuffer;
+  createBindGroup(desc: { layout: GPUBindGroupLayout; entries: { binding: number; resource: { buffer: GPUBuffer } }[] }): GPUBindGroup;
+  createCommandEncoder(): GPUCommandEncoder;
+}
+
+interface GPUShaderModule {}
+interface GPUBindGroupLayout {}
+interface GPUPipelineLayout {}
+interface GPURenderPipeline {}
+interface GPUBuffer {}
+interface GPUBindGroup {}
+interface GPUCommandBuffer {}
+interface GPUCommandEncoder {
+  beginRenderPass(desc: {
+    colorAttachments: {
+      view: GPUTextureView;
+      clearValue: { r: number; g: number; b: number; a: number };
+      loadOp: string;
+      storeOp: string;
+    }[];
+  }): GPURenderPassEncoder;
+  finish(): GPUCommandBuffer;
+}
+interface GPURenderPassEncoder {
+  setPipeline(pipeline: GPURenderPipeline): void;
+  setBindGroup(index: number, bindGroup: GPUBindGroup): void;
+  draw(vertexCount: number): void;
+  end(): void;
+}
+interface GPUCanvasContext {
+  configure(desc: { device: GPUDevice; format: string; alphaMode: string }): void;
+  getCurrentTexture(): { createView(): GPUTextureView };
+}
+interface GPUTextureView {}
+
+declare global {
+  interface Window {
+    GPUShaderStage?: {
+      VERTEX: number;
+      FRAGMENT: number;
+      COMPUTE: number;
+    };
+    GPUBufferUsage?: {
+      MAP_READ: number;
+      MAP_WRITE: number;
+      COPY_SRC: number;
+      COPY_DST: number;
+      INDEX: number;
+      VERTEX: number;
+      UNIFORM: number;
+      STORAGE: number;
+    };
+  }
+
+  interface Navigator {
+    gpu?: GPU;
+  }
+
+  interface HTMLCanvasElement {
+    getContext(contextId: 'webgpu'): GPUCanvasContext | null;
+  }
+}
+
 /**
  * WebGPURedraw.tsx
  * 
@@ -48,28 +129,30 @@ export const WebGPURedraw: React.FC = () => {
 
     // --- WebGPU Implementation ---
     const initWebGPU = async () => {
-      // Cast navigators to bypass standard typescript browser context checking
-      const nav = navigator as any;
-      if (!nav.gpu) {
+      if (!navigator.gpu) {
         console.warn('WebGPU not supported in this browser. Falling back to WebGL.');
         return false;
       }
 
-      const adapter = await nav.gpu.requestAdapter();
+      const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) {
         console.warn('No WebGPU adapter found. Falling back to WebGL.');
         return false;
       }
 
       const device = await adapter.requestDevice();
-      const context = canvas.getContext('webgpu') as any;
+      if (!device) {
+        console.warn('Failed to request WebGPU device. Falling back to WebGL.');
+        return false;
+      }
+      const context = canvas.getContext('webgpu');
       if (!context) {
         console.warn('Failed to get WebGPU context. Falling back to WebGL.');
         return false;
       }
 
       // Configure the WebGPU canvas context
-      const format = nav.gpu.getPreferredCanvasFormat();
+      const format = navigator.gpu.getPreferredCanvasFormat();
       context.configure({
         device,
         format,
@@ -151,12 +234,12 @@ export const WebGPURedraw: React.FC = () => {
       });
 
       // Declare WebGPU numeric masks for typescript environments without global types
-      const GPUShaderStage = (window as any).GPUShaderStage || {
+      const GPUShaderStage = window.GPUShaderStage || {
         VERTEX: 0x1,
         FRAGMENT: 0x2,
         COMPUTE: 0x4,
       };
-      const GPUBufferUsage = (window as any).GPUBufferUsage || {
+      const GPUBufferUsage = window.GPUBufferUsage || {
         MAP_READ: 0x1,
         MAP_WRITE: 0x2,
         COPY_SRC: 0x4,
@@ -241,7 +324,7 @@ export const WebGPURedraw: React.FC = () => {
         const commandEncoder = device.createCommandEncoder();
         const textureView = context.getCurrentTexture().createView();
 
-        const renderPassDescriptor: any = {
+        const renderPassDescriptor = {
           colorAttachments: [
             {
               view: textureView,

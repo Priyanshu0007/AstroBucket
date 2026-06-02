@@ -2,7 +2,7 @@ import React from 'react';
 
 interface SpreadsheetPreviewProps {
   sheetNames: string[];
-  sheetData: any[][];
+  sheetData: (string | number | boolean | null | undefined)[][];
   activeSheetIdx: number;
   onSheetChange: (idx: number) => void;
 }

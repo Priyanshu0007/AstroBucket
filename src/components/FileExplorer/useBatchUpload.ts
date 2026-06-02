@@ -26,7 +26,7 @@ export function useBatchUpload({
 
   // Elapsed time tracker for speed calculations
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setInterval> | undefined = undefined;
     const isUploading = uploadQueue.some(item => item.status === 'uploading');
     if (isUploading) {
       timer = setInterval(() => {
@@ -112,13 +112,13 @@ export function useBatchUpload({
           progress: 100, 
           uploadedBytes: item.size 
         });
-      } catch (err: any) {
+      } catch (err) {
         clearInterval(progressInterval);
         console.error(`Failed to upload ${item.name}:`, err);
         updateItemStatus(item.id, { 
           status: 'failed', 
           progress: 0, 
-          error: err.message || 'Upload failed' 
+          error: err instanceof Error ? err.message : 'Upload failed' 
         });
       }
     };

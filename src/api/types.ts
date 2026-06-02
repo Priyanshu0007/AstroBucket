@@ -28,6 +28,20 @@ export interface GithubRepo {
   stargazers_count: number;
 }
 
+export interface GithubRawRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  default_branch?: string;
+  description: string | null;
+  private: boolean;
+  html_url: string;
+  stargazers_count?: number;
+  owner: {
+    login: string;
+  };
+}
+
 export interface GithubProfile {
   login: string;
   avatar_url: string;

@@ -6,10 +6,11 @@ interface UploadZoneProps {
   onUpload: (files: { file: File; relativePath: string }[]) => void;
 }
 
-const getFilesFromEntry = async (entry: any): Promise<{ file: File; relativePath: string }[]> => {
+const getFilesFromEntry = async (entry: FileSystemEntry): Promise<{ file: File; relativePath: string }[]> => {
   if (entry.isFile) {
+    const fileEntry = entry as FileSystemFileEntry;
     return new Promise((resolve) => {
-      entry.file((file: File) => {
+      fileEntry.file((file: File) => {
         const cleanPath = entry.fullPath.startsWith('/') 
           ? entry.fullPath.substring(1) 
           : entry.fullPath;
@@ -17,15 +18,16 @@ const getFilesFromEntry = async (entry: any): Promise<{ file: File; relativePath
       });
     });
   } else if (entry.isDirectory) {
-    const dirReader = entry.createReader();
-    const readEntries = (): Promise<any[]> => {
+    const dirEntry = entry as FileSystemDirectoryEntry;
+    const dirReader = dirEntry.createReader();
+    const readEntries = (): Promise<FileSystemEntry[]> => {
       return new Promise((resolve, reject) => {
         dirReader.readEntries(resolve, reject);
       });
     };
 
     try {
-      let entries: any[] = [];
+      let entries: FileSystemEntry[] = [];
       let readBatch = await readEntries();
       while (readBatch.length > 0) {
         entries = entries.concat(readBatch);
@@ -45,7 +47,7 @@ const getFilesFromEntry = async (entry: any): Promise<{ file: File; relativePath
 };
 
 const parseDroppedItems = async (items: DataTransferItemList): Promise<{ file: File; relativePath: string }[]> => {
-  const entries: any[] = [];
+  const entries: FileSystemEntry[] = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (item.kind === 'file') {

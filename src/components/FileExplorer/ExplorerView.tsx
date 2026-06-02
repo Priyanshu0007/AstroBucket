@@ -374,9 +374,9 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
       queryClient.invalidateQueries({
         queryKey: ['repoTree', session.owner, activeRepo.repo, activeRepo.branch],
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert(`Failed to move file: ${err.message || 'Unknown error'}`);
+      alert(`Failed to move file: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setMovingItems(prev => {
         const copy = { ...prev };

@@ -382,29 +382,29 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({
                 }
                 
                 onClose();
-              } catch (innerErr: any) {
+              } catch (innerErr) {
                 console.error(innerErr);
                 setSaving(false);
-                setSavingError(innerErr.message || 'Error occurred while saving file contents');
+                setSavingError(innerErr instanceof Error ? innerErr.message : 'Error occurred while saving file contents');
               }
             };
             reader.onerror = () => {
               setSaving(false);
               setSavingError('Failed to read image blob as data URL');
             };
-          } catch (err: any) {
+          } catch (err) {
             console.error(err);
             setSaving(false);
-            setSavingError(err.message || 'Error occurred while saving file contents');
+            setSavingError(err instanceof Error ? err.message : 'Error occurred while saving file contents');
           }
         },
         compressionFormat,
         compressionFormat === 'image/png' ? undefined : compressionQuality
       );
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setSaving(false);
-      setSavingError(err.message || 'Failed to draw filters');
+      setSavingError(err instanceof Error ? err.message : 'Failed to draw filters');
     }
   };
 

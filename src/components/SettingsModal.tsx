@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Key, Save, X, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { AstroBucketLogo } from './AstroBucketLogo';
 import { fetchUserProfile } from '../api/client';
@@ -56,11 +57,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       } else {
         throw new Error('Failed to parse user profile details.');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('PAT verification error:', err);
-      const errMsg = err?.response?.status === 401 
-        ? 'Invalid Personal Access Token. Make sure scopes are correct.' 
-        : 'Verification failed. Please check your token and network connection.';
+      let errMsg = 'Verification failed. Please check your token and network connection.';
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        errMsg = 'Invalid Personal Access Token. Make sure scopes are correct.';
+      }
       setError(errMsg);
     } finally {
       setConnecting(false);

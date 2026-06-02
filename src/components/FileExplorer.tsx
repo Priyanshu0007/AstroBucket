@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import type { GithubFile } from '../api/types';
 import { getCdnUrl, fetchFileRaw } from '../api/client';
 import JSZip from 'jszip';
@@ -207,9 +208,9 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         contentBase64: '',
         message: `Create folder ${folderName}`
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert(`Failed to create folder: ${err.message || 'Unknown error'}`);
+      alert(`Failed to create folder: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLocalActionLoading(false);
     }
@@ -250,12 +251,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
           sha: file.sha,
           message: `Delete via AstroBucket`
         });
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
-        if (err?.response?.data?.message?.includes('Resource not accessible')) {
+        if (axios.isAxiosError(err) && (err.response?.data as { message?: string } | undefined)?.message?.includes('Resource not accessible')) {
           alert('GitHub Token Error: Your Personal Access Token does not have write access. Please ensure your token has "Contents: Read and write" repository permissions.');
         } else {
-          alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
+          alert(`Failed to delete file: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
       } finally {
         setLocalActionLoading(false);
@@ -279,9 +280,9 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ session, onLogout })
         sha,
         message: `Delete via AstroBucket`
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      alert(`Failed to delete file: ${err.message || 'Unknown error'}`);
+      alert(`Failed to delete file: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLocalActionLoading(false);
     }

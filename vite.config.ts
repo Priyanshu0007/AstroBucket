@@ -79,7 +79,15 @@ export default defineConfig(({ mode }) => {
                   })
                 });
 
-                const data = (await response.json()) as any;
+                interface TokenResponse {
+                  access_token?: string;
+                  scope?: string;
+                  token_type?: string;
+                  error?: string;
+                  error_description?: string;
+                }
+
+                const data = (await response.json()) as TokenResponse;
                 if (data.error) {
                   res.statusCode = 400;
                   res.setHeader('Content-Type', 'application/json');
@@ -107,10 +115,10 @@ export default defineConfig(({ mode }) => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ access_token: accessToken, user }));
-              } catch (err: any) {
+              } catch (err) {
                 res.statusCode = 500;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: err.message || 'OAuth exchange failed' }));
+                res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'OAuth exchange failed' }));
               }
               return;
             }

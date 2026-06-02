@@ -4,7 +4,8 @@ import type {
   GithubFile,
   GithubRepo,
   GithubProfile,
-  GithubTreeItem
+  GithubTreeItem,
+  GithubRawRepo
 } from './types';
 
 export const apiClient = axios.create({
@@ -66,11 +67,11 @@ export const fetchUserRepos = async (token?: string, owner?: string): Promise<Gi
   }
   try {
     const response = await apiClient.get('/user/repos?per_page=100&sort=updated', { headers });
-    const filtered = response.data.filter(
-      (repo: any) => repo.owner.login.toLowerCase() === owner?.toLowerCase()
+    const filtered = (response.data as GithubRawRepo[]).filter(
+      (repo) => repo.owner.login.toLowerCase() === owner?.toLowerCase()
     );
     if (filtered.length > 0) {
-      return filtered.map((repo: any) => ({
+      return filtered.map((repo) => ({
         id: repo.id,
         name: repo.name,
         full_name: repo.full_name,
@@ -85,8 +86,8 @@ export const fetchUserRepos = async (token?: string, owner?: string): Promise<Gi
     console.error('Failed to list repos via user endpoint, falling back', err);
   }
 
-  const response = await apiClient.get(`/users/${owner}/repos?per_page=100&sort=updated`, { headers });
-  return response.data.map((repo: any) => ({
+  const response = await apiClient.get<GithubRawRepo[]>(`/users/${owner}/repos?per_page=100&sort=updated`, { headers });
+  return response.data.map((repo) => ({
     id: repo.id,
     name: repo.name,
     full_name: repo.full_name,
@@ -116,9 +117,11 @@ export const fetchContents = async (
     const data = response.data;
     const filesList = Array.isArray(data) ? data : [data];
     return filesList.filter((file: GithubFile) => file.name !== '.gitkeep');
-  } catch (err: any) {
-    if (err?.response?.status === 404) {
-      return [];
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      if (err.response?.status === 404) {
+        return [];
+      }
     }
     throw err;
   }
@@ -157,7 +160,14 @@ export const uploadFile = async (
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const body: any = {
+  interface UploadFileBody {
+    message: string;
+    content: string;
+    branch: string;
+    sha?: string;
+  }
+
+  const body: UploadFileBody = {
     message,
     content: contentBase64,
     branch,

@@ -1,11 +1,18 @@
-/**
- * /api/auth/github.ts
- * 
- * Vercel Serverless Function to exchange OAuth `code` for an access token.
- * Prevents exposing `client_secret` to client browsers.
- */
+import type { IncomingMessage, ServerResponse } from 'http';
 
-export default async function handler(req: any, res: any) {
+interface VercelRequest extends IncomingMessage {
+  body: {
+    code?: string;
+  };
+  method?: string;
+}
+
+interface VercelResponse extends ServerResponse {
+  status(statusCode: number): VercelResponse;
+  json(body: Record<string, string | number | boolean | object | null | undefined>): void;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,13 +28,15 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    res.status(405).json({ error: 'Method Not Allowed' });
+    return;
   }
 
   try {
     const { code } = req.body;
     if (!code) {
-      return res.status(400).json({ error: 'Code parameter is required' });
+      res.status(400).json({ error: 'Code parameter is required' });
+      return;
     }
 
     // Dev backdoor: if code starts with mock_code_, extract token and fetch profile
@@ -47,7 +56,8 @@ export default async function handler(req: any, res: any) {
       }
       
       const user = await userRes.json();
-      return res.status(200).json({ access_token: mockToken, user });
+      res.status(200).json({ access_token: mockToken, user });
+      return;
     }
 
     // Real OAuth exchange
@@ -55,9 +65,10 @@ export default async function handler(req: any, res: any) {
     const clientSecret = process.env.GITHUB_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      return res.status(500).json({
+      res.status(500).json({
         error: 'GitHub Client ID or Client Secret is not configured on the serverless backend.'
       });
+      return;
     }
 
     const response = await fetch('https://github.com/login/oauth/access_token', {
@@ -73,9 +84,10 @@ export default async function handler(req: any, res: any) {
       })
     });
 
-    const data = await response.json();
+    const data = await response.json() as { access_token?: string; error?: string; error_description?: string };
     if (data.error) {
-      return res.status(400).json({ error: data.error_description || data.error });
+      res.status(400).json({ error: data.error_description || data.error });
+      return;
     }
 
     const accessToken = data.access_token;
@@ -94,9 +106,12 @@ export default async function handler(req: any, res: any) {
     }
 
     const user = await userRes.json();
-    return res.status(200).json({ access_token: accessToken, user });
-  } catch (err: any) {
+    res.status(200).json({ access_token: accessToken || '', user });
+    return;
+  } catch (err) {
     console.error('OAuth proxy exchange error:', err);
-    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    res.status(500).json({ error: message });
+    return;
   }
 }

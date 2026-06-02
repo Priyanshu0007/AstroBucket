@@ -46,9 +46,14 @@ function App() {
           } else {
             throw new Error('Invalid token details returned.');
           }
-        } catch (err: any) {
+        } catch (err) {
           console.error('OAuth exchange error:', err);
-          const msg = err.response?.data?.error || err.message || 'Failed to exchange authentication code.';
+          let msg = 'Failed to exchange authentication code.';
+          if (axios.isAxiosError(err)) {
+            msg = err.response?.data?.error || err.message || msg;
+          } else if (err instanceof Error) {
+            msg = err.message;
+          }
           setAuthError(msg);
         } finally {
           setLoadingSession(false);

@@ -61,7 +61,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // Content states
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState<string>('');
-  const [sheetData, setSheetData] = useState<any[][]>([]);
+  const [sheetData, setSheetData] = useState<(string | number | boolean | null | undefined)[][]>([]);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIdx, setActiveSheetIdx] = useState<number>(0);
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
@@ -199,7 +199,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           
           if (workbook.SheetNames.length > 0) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+            const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as (string | number | boolean | null | undefined)[][];
             setSheetData(data);
           }
         } else if (type === 'document') {
@@ -207,10 +207,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         }
 
         setLoading(false);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error previewing file:', err);
         if (active) {
-          setError(err.message || 'Could not load file preview');
+          setError(err instanceof Error ? err.message : 'Could not load file preview');
           setLoading(false);
         }
       }
@@ -239,10 +239,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const sheetName = workbook.SheetNames[index];
       const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number | boolean | null | undefined)[][];
       setSheetData(data);
       setLoading(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError('Could not switch sheets');
       setLoading(false);
