@@ -5,6 +5,8 @@ import type { GithubRepo } from '../../api/types';
 import type { AttachedRepo } from './types';
 import { AlertCircle, BookOpen, Trash2, RefreshCw, Search, Plus } from 'lucide-react';
 import { apiClient } from '../../api/client';
+import { CreateBucketModal } from './CreateBucketModal';
+
 
 interface WelcomeDashboardProps {
   session: GithubSession;
@@ -32,6 +34,7 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
   const [manualBranch, setManualBranch] = useState('main');
   const [manualError, setManualError] = useState('');
   const [attachingManual, setAttachingManual] = useState(false);
+  const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
 
   // Filter repositories locally
   const filteredRepos = githubRepos.filter(r => 
@@ -77,6 +80,27 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
         <p className="text-muted" style={{ maxWidth: '600px', fontSize: '1rem', lineHeight: '1.5', marginBottom: '1.25rem' }}>
           Connect your GitHub repositories to convert them into S3-like storage buckets with free, global jsDelivr edge CDN link sharing.
         </p>
+
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setIsCreateWizardOpen(true)}
+            style={{ 
+              padding: '0.75rem 1.5rem', 
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.5rem',
+              background: 'linear-gradient(135deg, var(--primary), #a855f7)',
+              boxShadow: '0 4px 20px rgba(168, 85, 247, 0.25)',
+              border: 'none'
+            }}
+          >
+            <Plus size={18} /> Create New Bucket
+          </button>
+        </div>
+
         <div style={{
           background: 'rgba(245, 158, 11, 0.05)',
           border: '1px solid rgba(245, 158, 11, 0.15)',
@@ -273,6 +297,16 @@ export const WelcomeDashboard: React.FC<WelcomeDashboardProps> = ({
           </form>
         </div>
       </div>
+
+      <CreateBucketModal
+        isOpen={isCreateWizardOpen}
+        onClose={() => setIsCreateWizardOpen(false)}
+        session={session}
+        onSuccess={(repoName, defaultBranch) => {
+          attachRepo(repoName, defaultBranch);
+          loadGithubRepos();
+        }}
+      />
     </div>
   );
 };

@@ -5,6 +5,8 @@
 @import './components/explorer-advanced.css';
 @import './components/preview-modal.css';
 @import './components/analytics-view.css';
+@import './components/create-bucket-modal.css';
+
 
 /* ==========================================================================
    Dashboard Workspace & Sidebar Layout Styles
