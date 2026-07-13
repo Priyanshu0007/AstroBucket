@@ -1,73 +1,146 @@
-# React + TypeScript + Vite
+# ✦ AstroBucket — Serverless GitHub-backed CDN Console
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**An open-source, serverless S3-style console that allows you to manage assets inside your GitHub repositories and generate edge-cached jsDelivr CDN links instantly. A free, lightweight content delivery network backend.**
 
-Currently, two official plugins are available:
+[![React](https://img.shields.io/badge/React-19.2-blue?style=for-the-badge&logo=react)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![jsDelivr](https://img.shields.io/badge/CDN-jsDelivr-E84D3D?style=for-the-badge&logo=jsdelivr&logoColor=white)](https://www.jsdelivr.com/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+[![Home Page](https://cdn.jsdelivr.net/gh/Priyanshu0007/CDN@main/astrobucket/astrobucket-landing.png)](#)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+*Landing Page — fluid glassmorphism design with a WebGPU-inspired aesthetic.*
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 📋 Table of Contents
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Screenshots](#-screenshots)
+- [Tech Stack](#-tech-stack)
+- [Architecture Overview](#-architecture-overview)
+- [Key Features](#-key-features)
+- [Getting Started](#-getting-started)
+- [Design System](#-design-system)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 📸 Screenshots
+
+### 🚀 Storage Console
+[![Storage Console Page](https://cdn.jsdelivr.net/gh/Priyanshu0007/CDN@main/astrobucket/astrobucket-bucket-page.png)](#)
+
+*S3-style File Explorer — browse, manage, and upload assets directly to your GitHub repository.*
+
+### 🔐 Secure Connection
+[![Login Modal Page](https://cdn.jsdelivr.net/gh/Priyanshu0007/CDN@main/astrobucket/astrobucket-login.png)](#)
+
+*OAuth Connection — securely connect your GitHub account entirely on the client side.*
+
+### 📊 Real-time Stats
+[![Stats Page](https://cdn.jsdelivr.net/gh/Priyanshu0007/CDN@main/astrobucket/astrobucket-stats-page.png)](#)
+
+*File Analytics — analyze your storage usage with visual metrics and charts.*
+
+---
+
+## 🛠️ Tech Stack
+
+### Core Framework
+
+| Technology | Version | Role |
+|------------|---------|------|
+| [React](https://react.dev/) | `19.2` | Core UI Library |
+| [Vite](https://vitejs.dev/) | `8.0` | Next-generation frontend tooling |
+| TypeScript | `~6.0` | Strict typing and code integrity |
+
+### Styling & Integrations
+
+| Technology | Role |
+|------------|------|
+| Vanilla CSS | Custom Glassmorphism design system |
+| GitHub API | Direct client-to-API communication for asset storage |
+| jsDelivr | Infinite bandwidth global edge-caching for assets |
+| Lucide React | Clean, consistent vector icons |
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+                        ┌────────────────────────────────────────┐
+                        │             React Client               │
+                        │        (Browser Local Storage)         │
+                        └───────────────────┬────────────────────┘
+                                            │
+                                100% Client-Side API Calls
+                                            ▼
+                        ┌────────────────────────────────────────┐
+                        │            GitHub REST API             │
+                        │    (Reads/Writes Commits to Repos)     │
+                        └───────────┬────────────────┬───────────┘
+                                    │                │
+            Uploads Assets          │                │ Serves Cached Links
+                                    ▼                ▼
+                        ┌───────────┴────┐   ┌───────┴───────────┐
+                        │   GitHub Repo  │──▶│    jsDelivr CDN   │
+                        │(Storage Layer) │   │ (Edge Networking) │
+                        └────────────────┘   └───────────────────┘
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Key Architectural Decisions
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **Serverless & Local-First**: AstroBucket has no backend middleman. Your OAuth tokens are stored in `localStorage` and all API requests are made directly from your browser to GitHub.
+- **Git as a Database**: Re-purposes GitHub repositories to act as storage buckets, leveraging Git's versioning and tree structure to create a virtual filesystem.
+- **Edge Distribution**: Instantly converts GitHub raw file paths into `cdn.jsdelivr.net/gh/...` links, giving your assets enterprise-grade edge caching for free.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 🚀 Key Features
+
+- **On-Device Privacy**: Your credentials and personal access tokens never leave your browser.
+- **Instant Global CDN**: Uploaded assets are immediately served using jsDelivr edge networks. Benefit from automated CDN caching, file minification, and gzip compression.
+- **S3-Style Console**: Create subdirectories, preview assets, delete files, and drag-and-drop uploads inside an intuitive visual workspace mimicking AWS S3.
+- **Fluid Glassmorphism UI**: Beautiful, hardware-accelerated aesthetic with frosted glass panels, subtle gradients, and reactive micro-animations.
+
+---
+
+## 💻 Getting Started
+
+### Prerequisites
+
+- Node.js `>= 20.0`
+- [npm](https://www.npmjs.com/) or [Bun](https://bun.sh)
+- A GitHub account (a secondary/burner account is recommended to keep your primary commit graph clean)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Priyanshu0007/AstroBucket.git
+cd AstroBucket
+
+# Install dependencies
+npm install
+
+# Start the Vite development server
+npm run dev
 ```
+
+---
+
+## 🎨 Design System
+
+- **Glassmorphism**: Built from the ground up using custom vanilla CSS. Heavy use of `backdrop-filter: blur()`, semi-transparent backgrounds, and stark contrast text.
+- **Typography Guidelines**:
+  - Headings: `Outfit` for modern, geometric display titles.
+  - Body: `Inter` for highly readable interfaces and data displays.
+- **Theme**: Deep space dark mode (`#0f1115`) accented with vibrant primary blues (`#3b82f6`) and dynamic text gradients.
+
+---
+
+**Built with ♥ by [Priyanshu Gupta](https://priyanshu0007.vercel.app)**
+
+[![GitHub](https://img.shields.io/badge/GitHub-Priyanshu0007-181717?style=flat-square&logo=github)](https://github.com/Priyanshu0007)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Live-22c55e?style=flat-square&logo=vercel)](https://priyanshu0007.vercel.app)
